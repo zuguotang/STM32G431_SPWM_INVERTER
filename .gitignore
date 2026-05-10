@@ -1,0 +1,12 @@
+# Build outputs
+build/
+
+# Editor/IDE files
+*.uvopt
+*.uvproj
+*.eww
+*.ewp
+*.launch
+.DS_Store
+Thumbs.db
+.vscode/
