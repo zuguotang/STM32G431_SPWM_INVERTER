@@ -52,9 +52,17 @@
 #define VOUT_ADC_LOW_LOCK               480U
 #define VBUS_ADC_MIN_RUN                1040U
 #define VBUS_ADC_MAX_RUN                3900U
-#define IOUT_ADC_OVERLOAD               3040U
-/* 软件短路阈值：拉开与过载(3040)的距离(4000≈98%量程)，避免感性负载误触发 */
-#define IOUT_ADC_SHORT_SW               4000U
+/*
+ * 两级过流保护（同一 ADC 通道，不同延时）
+ * 软件短路已移除——真短路由硬件 BKIN + PA4 处理（纳秒级 + 重试计数）
+ *
+ * Lv1 过载 100%: >3040, 5s → 锁存 FAULT_OVERLOAD
+ * Lv2 过流 110%: >3344, 2s → 锁存 FAULT_OVERLOAD
+ * Lv3 过流 120%: >3648, 0.5s → 锁存 FAULT_OVERLOAD（逼近短路）
+ */
+#define IOUT_ADC_OVERLOAD               3040U     /* 100% 基线 */
+#define IOUT_ADC_OVERLOAD_LV2_PCT       110U      /* 110% */
+#define IOUT_ADC_OVERLOAD_LV3_PCT       120U      /* 120% */
 #define TEMP_ADC_FAN_ON                 2480U
 #define TEMP_ADC_OVER                   3040U
 #define TEMP_ADC_RECOVER                2760U
@@ -67,10 +75,14 @@
  * ================================================================== */
 
 #define STARTUP_CURRENT_BLANK_MS        1000UL
-/* OVERLOAD_TRIP_MS → 运行时可调，见第 7 节 */
+/* OVERLOAD_TRIP_MS → 运行时可调（Lv1基线），见第 7 节 */
+/* Lv2/Lv3 延时 = OVERLOAD_TRIP_MS 的百分比 */
+
+#define OVERLOAD_LV1_TRIP_MS            5000UL  /* 100% 过载: 5s */
+#define OVERLOAD_LV2_TRIP_MS            2000UL  /* 110% 过流: 2s */
+#define OVERLOAD_LV3_TRIP_MS            500UL   /* 120% 过流: 0.5s（逼近短路） */
 
 #define OVERLOAD_RECOVER_MS             500UL
-#define SHORT_SW_TRIP_MS                2UL
 #define SHORT_RETRY_DELAY_MS            2000UL
 #define SHORT_RETRY_MAX                 3U
 #define UNDER_BUS_TRIP_MS               80UL

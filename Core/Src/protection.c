@@ -32,7 +32,6 @@ volatile fault_code_t g_fault = FAULT_NONE;
 /* 保护状态变量 */
 static uint16_t s_overload_ms;           /* 过载累计 ms */
 static uint16_t s_overload_recover_ms;   /* 过载恢复累计 ms */
-static uint16_t s_short_sw_ms;           /* 软件短路确认 ms */
 static uint16_t s_under_bus_ms;          /* 欠压确认 ms */
 static uint16_t s_output_low_ms;         /* 输出欠压确认 ms */
 static uint16_t s_short_retry_wait_ms;   /* 短路重试等待 ms */
@@ -54,7 +53,6 @@ void protection_reset_for_start(void)
 {
     s_overload_ms = 0;
     s_overload_recover_ms = 0;
-    s_short_sw_ms = 0;
     s_under_bus_ms = 0;
     s_output_low_ms = 0;
     s_short_retry_wait_ms = 0;
@@ -278,27 +276,30 @@ void protection_task_1ms(void)
     }
 
     /*
-     * 任务 9：软件短路检测
-     *   ADC 电流超过软件短路阈值持续 SHORT_SW_TRIP_MS (2 ms) → 短路。
-     *   这作为硬件 BKIN（微秒级）的补充保护。
-     */
-    if (g_adc.iout > IOUT_ADC_SHORT_SW) {
-        if (++s_short_sw_ms >= SHORT_SW_TRIP_MS) {
-            protection_short_hw_event();
-        }
-        return;
-    }
-    s_short_sw_ms = 0;
-
-    /*
-     * 任务 10：过载检测
-     *   仅在启动电流屏蔽窗口 (250 ms) 之后检测。
-     *   连续过载 OVERLOAD_TRIP_MS (1.5 s) 后触发保护。
-     *   电流回落并保持 OVERLOAD_RECOVER_MS (500 ms) 后清零计时器。
+     * 任务 9：三级过流检测（替代旧的过载+软件短路两套体系）
+     *
+     *   过流等级        阈值             延时      动作
+     *   Lv1 过载    IOUT_ADC_OVERLOAD              5000ms    锁存故障
+     *   Lv2 过流    > 3040 × 110% = 3344           2000ms    锁存故障
+     *   Lv3 过流    > 3040 × 120% = 3648            500ms    锁存故障（逼近短路速度）
+     *
+     *   真短路由硬件 BKIN (PA6) 纳秒关断 + PA4 通知 MCU 重试计数。
+     *   软件不再重复检测短路，只做多级过流。
      */
     if (s_run_ms > STARTUP_CURRENT_BLANK_MS && g_adc.iout > IOUT_ADC_OVERLOAD) {
+        uint16_t trip_ms;
+
+        /* 根据电流等级选择不同的确认延时 */
+        if (g_adc.iout > (IOUT_ADC_OVERLOAD * IOUT_ADC_OVERLOAD_LV3_PCT / 100U)) {
+            trip_ms = OVERLOAD_LV3_TRIP_MS;   /* 120%: 严重过流, 0.5s */
+        } else if (g_adc.iout > (IOUT_ADC_OVERLOAD * IOUT_ADC_OVERLOAD_LV2_PCT / 100U)) {
+            trip_ms = OVERLOAD_LV2_TRIP_MS;   /* 110%: 中度过流, 2s */
+        } else {
+            trip_ms = OVERLOAD_LV1_TRIP_MS;   /* 100%: 轻度过载, 5s */
+        }
+
         s_overload_recover_ms = 0;
-        if (++s_overload_ms >= OVERLOAD_TRIP_MS) {
+        if (++s_overload_ms >= trip_ms) {
             protection_latch_fault(FAULT_OVERLOAD);
         }
     } else if (s_overload_ms > 0U) {
