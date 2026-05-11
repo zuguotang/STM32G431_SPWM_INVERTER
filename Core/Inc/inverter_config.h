@@ -53,7 +53,8 @@
 #define VBUS_ADC_MIN_RUN                1040U
 #define VBUS_ADC_MAX_RUN                3900U
 #define IOUT_ADC_OVERLOAD               3040U
-#define IOUT_ADC_SHORT_SW               3720U
+/* 软件短路阈值：拉开与过载(3040)的距离(4000≈98%量程)，避免感性负载误触发 */
+#define IOUT_ADC_SHORT_SW               4000U
 #define TEMP_ADC_FAN_ON                 2480U
 #define TEMP_ADC_OVER                   3040U
 #define TEMP_ADC_RECOVER                2760U
