@@ -114,17 +114,19 @@
 #define SHORT_MCU_GPIO_Port             GPIOA
 #define SHORT_MCU_Pin                   GPIO_PIN_4
 
-/* Nokia 5110 LCD（SPI1 + 3 GPIO） */
-#define LCD_SCE_GPIO_Port               GPIOB
-#define LCD_SCE_Pin                     GPIO_PIN_10
-#define LCD_RST_GPIO_Port               GPIOA
-#define LCD_RST_Pin                     GPIO_PIN_12
-#define LCD_DC_GPIO_Port                GPIOA
-#define LCD_DC_Pin                      GPIO_PIN_15
+/* SSD1306 OLED (I2C2: PB10=SCL, PB11=SDA) */
+#define OLED_I2C_SCL_GPIO_Port          GPIOB
+#define OLED_I2C_SCL_Pin                GPIO_PIN_10
+#define OLED_I2C_SDA_GPIO_Port          GPIOB
+#define OLED_I2C_SDA_Pin                GPIO_PIN_11
 
-/* 按键（ADC 电阻分压，PA10 = ADC_IN13，独立于 4 通道扫描 ADC） */
-#define BUTTON_ADC_GPIO_Port            GPIOA
-#define BUTTON_ADC_Pin                  GPIO_PIN_10
+/* 按键（数字 GPIO，下拉输入） */
+#define BTN_UP_GPIO_Port                GPIOA
+#define BTN_UP_Pin                      GPIO_PIN_5
+#define BTN_DOWN_GPIO_Port              GPIOA
+#define BTN_DOWN_Pin                    GPIO_PIN_11
+#define BTN_OK_GPIO_Port                GPIOA
+#define BTN_OK_Pin                      GPIO_PIN_12
 
 /* TIM1_PWM 输出引脚（AF6） */
 #define PWM_AH_GPIO_Port                GPIOA    /* PA8  TIM1_CH1  A桥臂高侧 */

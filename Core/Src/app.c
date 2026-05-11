@@ -18,7 +18,7 @@
 #include "protection.h"
 #include "spwm.h"
 #include "param_store.h"
-#include "lcd_nokia5110.h"
+#include "ssd1306.h"
 #include "lcd_menu.h"
 #include "button.h"
 
@@ -103,8 +103,8 @@ void app_init(void)
     /* 8. 启动 TIM6 1 ms 时基中断 */
     HAL_TIM_Base_Start_IT(&htim6);
 
-    /* 8.5 初始化 LCD + 按键 + 菜单 */
-    lcd_init();
+    /* 8.5 初始化 OLED + 按键 + 菜单 */
+    ssd1306_init();
     button_init();
     menu_init();
 
@@ -225,12 +225,12 @@ void app_task_1ms(void)
     }
 
     /*
-     * 任务 6：按键扫描 + LCD 菜单
-     *   按键消抖 (~10us) + 菜单状态机 (~50us) + LCD DMA tick (~10us)
+     * 任务 6：按键扫描 + OLED 菜单 + I2C 逐页刷新
+     *   按键消抖 (~3us) + 菜单状态机 (~50us) + 一页 I2C 发送 (~260us)
      */
     button_scan_1ms();
     menu_task_1ms();
-    if (lcd_is_busy()) {
-        lcd_refresh_tick_1ms();
+    if (ssd1306_is_busy()) {
+        ssd1306_refresh_tick_1ms();
     }
 }

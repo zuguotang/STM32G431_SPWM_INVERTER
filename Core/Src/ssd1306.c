@@ -1,20 +1,20 @@
 /*
- * Nokia 5110 LCD 驱动实现 (PCD8544)
- * ================================
- * 软件 SPI 位操作 + 帧缓冲 + 逐组非阻塞刷新。
+ * SSD1306 OLED 驱动实现 (I2C, 128×64)
+ * ===================================
+ * 使用 HAL I2C 发送命令和数据，硬件 I2C2。
+ * 帧缓冲 1024 字节，逐页非阻塞刷新。
  */
 
-#include "lcd_nokia5110.h"
-#include "inverter_config.h"
+#include "ssd1306.h"
 #include "stm32g4xx_hal.h"
+#include <string.h>
 
-/* ==================================================================
- *  5×7 ASCII 字体 (32..127)
- *  每个字符 5 字节，一列一字节，高位在上。
- *  共 96 字符 × 5 字节 = 480 字节。
- * ================================================================== */
+/* 外部引用 I2C2 句柄（在 main.c 中定义） */
+extern I2C_HandleTypeDef hi2c2;
+
+/* 5×7 ASCII 字体 (32..127)，每字符 5 字节 */
 static const uint8_t font5x7[96][5] = {
-    {0x00,0x00,0x00,0x00,0x00}, /* SPACE */
+    {0x00,0x00,0x00,0x00,0x00}, /*   */
     {0x00,0x00,0x5F,0x00,0x00}, /* ! */
     {0x00,0x07,0x00,0x07,0x00}, /* " */
     {0x14,0x7F,0x14,0x7F,0x14}, /* # */
@@ -74,7 +74,7 @@ static const uint8_t font5x7[96][5] = {
     {0x03,0x04,0x78,0x04,0x03}, /* Y */
     {0x61,0x51,0x49,0x45,0x43}, /* Z */
     {0x00,0x00,0x7F,0x41,0x41}, /* [ */
-    {0x02,0x04,0x08,0x10,0x20}, /* \ */
+    {0x02,0x04,0x08,0x10,0x20}, /* backslash */
     {0x41,0x41,0x7F,0x00,0x00}, /* ] */
     {0x04,0x02,0x01,0x02,0x04}, /* ^ */
     {0x40,0x40,0x40,0x40,0x40}, /* _ */
@@ -111,108 +111,99 @@ static const uint8_t font5x7[96][5] = {
     {0x08,0x04,0x08,0x10,0x08}, /* ~ */
 };
 
-/* ==================================================================
- *  帧缓冲 (84×48 / 8 = 504 字节)
- *  按行组（bank）组织：fb[bank][col]，bank 0 是顶部 8 行。
- * ================================================================== */
-static uint8_t lcd_fb[LCD_FB_SIZE];
-static uint8_t s_bank;          /* 当前正在发送的行组 (0..5) */
-static bool s_busy;             /* true = 正在逐组发送 */
-static bool s_dirty;            /* true = 有未发送的数据 */
+/* 帧缓冲 */
+static uint8_t fb[SSD1306_FB_SIZE];
+static uint8_t s_page;    /* 当前发送页 0..7 */
+static bool    s_busy;
+static bool    s_dirty;
 
 /* ==================================================================
- *  软件 SPI 位操作
+ *  I2C 写入
  * ================================================================== */
-static void spi_write(uint8_t data)
-{
-    for (uint8_t b = 0; b < 8; b++) {
-        /* CLK low, set MOSI */
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, (data & 0x80) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-        data <<= 1;
-        /* CLK high (latch on rising edge) */
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    }
-}
-
-static void lcd_send_cmd(uint8_t cmd)
-{
-    HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET);  /* DC=0: 命令 */
-    HAL_GPIO_WritePin(LCD_SCE_GPIO_Port, LCD_SCE_Pin, GPIO_PIN_RESET); /* CE=0: 选中 */
-    spi_write(cmd);
-    HAL_GPIO_WritePin(LCD_SCE_GPIO_Port, LCD_SCE_Pin, GPIO_PIN_SET);   /* CE=1: 释放 */
-}
-
-static void lcd_send_data(uint8_t data)
-{
-    HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);    /* DC=1: 数据 */
-    HAL_GPIO_WritePin(LCD_SCE_GPIO_Port, LCD_SCE_Pin, GPIO_PIN_RESET);
-    spi_write(data);
-    HAL_GPIO_WritePin(LCD_SCE_GPIO_Port, LCD_SCE_Pin, GPIO_PIN_SET);
-}
-
-/* ==================================================================
- *  LCD 初始化
- * ================================================================== */
-void lcd_init(void)
+static bool i2c_write(uint8_t ctrl, const uint8_t *data, uint16_t len)
 {
     /*
-     * PCD8544 初始化序列（参考 datasheet）
+     * SSD1306 I2C 格式：
+     *   控制字节 (0x00=命令, 0x40=数据) + 数据
      *
-     * 上电后先硬件复位，再写配置命令。
-     * 偏置电压、温度系数、电压倍增器等使用推荐值。
+     * HAL_I2C_Mem_Write 自动发送：START + ADDR+W + Ctrl + Data + STOP
+     * 超时 10ms，I2C 400kHz 下 128 字节 ≈ 2.6ms。
      */
-    /* RST 引脚复位脉冲 */
-    HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
-    HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_SET);
+    return HAL_I2C_Mem_Write(&hi2c2, SSD1306_I2C_ADDR, ctrl,
+                             I2C_MEMADD_SIZE_8BIT,
+                             (uint8_t *)data, len, 10) == HAL_OK;
+}
 
-    /* SCE 初始高（未选中） */
-    HAL_GPIO_WritePin(LCD_SCE_GPIO_Port, LCD_SCE_Pin, GPIO_PIN_SET);
+static void send_cmd(uint8_t cmd)
+{
+    i2c_write(0x00, &cmd, 1);
+}
 
-    /* 初始化命令序列 */
-    lcd_send_cmd(0x21);  /* 功能设置：扩展指令集 (H=1) */
-    lcd_send_cmd(0xB0);  /* 设置 Vop（温度系数 + 偏置电压） */
-    lcd_send_cmd(0x04);  /* 温度系数 = 0 */
-    lcd_send_cmd(0x14);  /* 偏置系统 = 1:4 */
-    lcd_send_cmd(0x20);  /* 功能设置：基本指令集 (H=0) */
-    lcd_send_cmd(0x0C);  /* 显示控制：普通模式 (D=1, E=0) */
+/* ==================================================================
+ *  初始化
+ * ================================================================== */
+void ssd1306_init(void)
+{
+    /*
+     * SSD1306 初始化序列（参考 datasheet）
+     * 关闭显示 → 配置 → 开启显示
+     */
+    static const uint8_t init_seq[] = {
+        0xAE,       /* 显示关闭 */
+        0xD5, 0x80, /* 时钟分频/振荡器频率 */
+        0xA8, 0x3F, /* 复用比 = 64 */
+        0xD3, 0x00, /* 垂直偏移 = 0 */
+        0x40,       /* 起始行 = 0 */
+        0x8D, 0x14, /* 电荷泵使能 (0x14=内部DC-DC) */
+        0x20, 0x00, /* 寻址模式 = 水平 */
+        0xA1,       /* 段重映射 (左右翻转) */
+        0xC8,       /* COM 扫描方向 (上下翻转) */
+        0xDA, 0x12, /* COM 硬件配置 */
+        0x81, 0xCF, /* 对比度 = 207 */
+        0xD9, 0xF1, /* 预充电周期 */
+        0xDB, 0x40, /* VCOMH 电压 */
+        0xA4,       /* 全屏显示关闭 (按 RAM 内容显示) */
+        0xA6,       /* 正常显示 (非反色) */
+        0xAF,       /* 显示开启 */
+    };
 
-    lcd_clear();
-    lcd_request_refresh();
+    /* 逐条发送初始化命令 */
+    for (uint8_t i = 0; i < sizeof(init_seq); i++) {
+        send_cmd(init_seq[i]);
+    }
 
-    /* 等待整屏刷新完成 */
-    while (lcd_refresh_tick_1ms()) {}
-    while (lcd_is_busy()) {
-        lcd_refresh_tick_1ms();
+    ssd1306_clear();
+    ssd1306_request_refresh();
+
+    /* 等待初始刷新完成 */
+    while (ssd1306_refresh_tick_1ms()) {}
+    while (ssd1306_is_busy()) {
+        ssd1306_refresh_tick_1ms();
     }
 }
 
 /* ==================================================================
  *  帧缓冲操作
  * ================================================================== */
-void lcd_clear(void)
+void ssd1306_clear(void)
 {
-    memset(lcd_fb, 0, LCD_FB_SIZE);
+    memset(fb, 0, SSD1306_FB_SIZE);
     s_dirty = true;
 }
 
-void lcd_set_pixel(uint8_t x, uint8_t y, bool on)
+void ssd1306_set_pixel(uint8_t x, uint8_t y, bool on)
 {
-    if (x >= LCD_WIDTH || y >= LCD_HEIGHT) return;
+    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT) return;
 
-    uint16_t idx = (uint16_t)(y / 8) * LCD_WIDTH + x;
+    uint16_t idx = (uint16_t)(y / 8) * SSD1306_WIDTH + x;
     uint8_t bit = 1U << (y & 7U);
 
-    if (on) {
-        lcd_fb[idx] |= bit;
-    } else {
-        lcd_fb[idx] &= (uint8_t)~bit;
-    }
+    if (on) fb[idx] |= bit;
+    else    fb[idx] &= (uint8_t)~bit;
     s_dirty = true;
 }
 
-void lcd_draw_char(uint8_t x, uint8_t y, char c)
+void ssd1306_draw_char(uint8_t x, uint8_t y, char c)
 {
     if (c < 32 || c > 127) c = ' ';
     const uint8_t *glyph = font5x7[(uint8_t)c - 32];
@@ -220,33 +211,33 @@ void lcd_draw_char(uint8_t x, uint8_t y, char c)
     for (uint8_t col = 0; col < 5; col++) {
         uint8_t data = glyph[col];
         for (uint8_t row = 0; row < 7; row++) {
-            lcd_set_pixel((uint8_t)(x + col), (uint8_t)(y + row), (data & (1U << row)) != 0);
+            ssd1306_set_pixel((uint8_t)(x + col), (uint8_t)(y + row),
+                              (data & (1U << row)) != 0);
         }
     }
-    /* 列间距 = 1 像素（6px 字符宽度） */
 }
 
-void lcd_draw_string(uint8_t x, uint8_t y, const char *str)
+void ssd1306_draw_string(uint8_t x, uint8_t y, const char *str)
 {
     while (*str) {
-        lcd_draw_char(x, y, *str++);
+        ssd1306_draw_char(x, y, *str++);
         x += 6;
-        if (x >= LCD_WIDTH - 5) break;
+        if (x >= SSD1306_WIDTH - 5) break;
     }
 }
 
-void lcd_draw_hline(uint8_t x, uint8_t y, uint8_t w, bool on)
+void ssd1306_draw_hline(uint8_t x, uint8_t y, uint8_t w, bool on)
 {
-    for (uint8_t i = 0; i < w && (x + i) < LCD_WIDTH; i++) {
-        lcd_set_pixel((uint8_t)(x + i), y, on);
+    for (uint8_t i = 0; i < w && (x + i) < SSD1306_WIDTH; i++) {
+        ssd1306_set_pixel((uint8_t)(x + i), y, on);
     }
 }
 
-void lcd_fill_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
+void ssd1306_fill_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
 {
     for (uint8_t r = 0; r < h; r++) {
         for (uint8_t c = 0; c < w; c++) {
-            lcd_set_pixel((uint8_t)(x + c), (uint8_t)(y + r), on);
+            ssd1306_set_pixel((uint8_t)(x + c), (uint8_t)(y + r), on);
         }
     }
 }
@@ -254,43 +245,51 @@ void lcd_fill_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
 /* ==================================================================
  *  非阻塞刷新
  * ================================================================== */
-void lcd_request_refresh(void)
+void ssd1306_request_refresh(void)
 {
-    s_bank = 0;
+    s_page = 0;
     s_busy = true;
     s_dirty = false;
 }
 
-bool lcd_refresh_tick_1ms(void)
+bool ssd1306_refresh_tick_1ms(void)
 {
-    if (!s_busy) {
-        return false;
-    }
+    if (!s_busy) return false;
 
-    /* 发送当前行组 (84 字节) */
-    lcd_send_cmd((uint8_t)(0x80));               /* 列地址 = 0 */
-    lcd_send_cmd((uint8_t)(0x40 | s_bank));       /* 行地址 = s_bank */
+    /*
+     * SSD1306 页寻址模式：
+     *   1. 设置页地址 (0xB0 | page)
+     *   2. 设置列地址低/高半字节
+     *   3. 发送 128 字节数据
+     */
+    uint8_t cmds[] = {
+        (uint8_t)(0xB0 | s_page),  /* 页地址 */
+        0x00,                       /* 列低地址 */
+        0x10                        /* 列高地址 */
+    };
+    send_cmd(cmds[0]);
+    send_cmd(cmds[1]);
+    send_cmd(cmds[2]);
 
-    uint16_t offset = (uint16_t)s_bank * LCD_WIDTH;
-    for (uint8_t col = 0; col < LCD_WIDTH; col++) {
-        lcd_send_data(lcd_fb[offset + col]);
-    }
+    /* 发送当前页 128 字节 */
+    uint16_t offset = (uint16_t)s_page * SSD1306_WIDTH;
+    i2c_write(0x40, &fb[offset], SSD1306_WIDTH);
 
-    s_bank++;
-    if (s_bank >= LCD_BANKS) {
-        s_bank = 0;
+    s_page++;
+    if (s_page >= SSD1306_PAGES) {
+        s_page = 0;
         s_busy = false;
-        return true;  /* 完成 */
+        return true;
     }
     return false;
 }
 
-bool lcd_is_busy(void)
+bool ssd1306_is_busy(void)
 {
     return s_busy || s_dirty;
 }
 
-uint8_t *lcd_get_framebuffer(void)
+uint8_t *ssd1306_get_framebuffer(void)
 {
-    return lcd_fb;
+    return fb;
 }

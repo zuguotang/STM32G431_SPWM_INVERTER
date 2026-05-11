@@ -36,6 +36,7 @@ DMA_HandleTypeDef hdma_adc1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim6;
 UART_HandleTypeDef huart1;
+I2C_HandleTypeDef hi2c2;
 
 /* 1 ms 标志：TIM6 ISR 置位，主循环清零 */
 static volatile bool s_tick_1ms = false;
@@ -48,6 +49,7 @@ static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_I2C2_Init(void);
 
 /* ==================================================================
  *  main() 主函数
@@ -80,6 +82,7 @@ int main(void)
     MX_TIM1_Init();
     MX_TIM6_Init();
     MX_USART1_UART_Init();
+    MX_I2C2_Init();
 
     /*
      * 第 4 步：应用层初始化
@@ -370,6 +373,30 @@ static void MX_USART1_UART_Init(void)
 }
 
 /* ==================================================================
+ *  I2C2 初始化：SSD1306 OLED
+ * ================================================================== */
+static void MX_I2C2_Init(void)
+{
+    /*
+     * I2C2: PB10=SCL, PB11=SDA, 400kHz Fast Mode
+     * SSD1306 支持 100kHz 和 400kHz，这里选 400kHz 以便快速刷新。
+     * 8 页 × 128 字节 × 9 bits / 400kHz ≈ 23ms 全屏刷新。
+     */
+    hi2c2.Instance = I2C2;
+    hi2c2.Init.Timing = 0x00303D5B;  /* 170MHz 下 400kHz 的推荐 Timing 值 */
+    hi2c2.Init.OwnAddress1 = 0;
+    hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    hi2c2.Init.OwnAddress2 = 0;
+    hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+    hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    if (HAL_I2C_Init(&hi2c2) != HAL_OK) {
+        Error_Handler();
+    }
+}
+
+/* ==================================================================
  *  DMA 初始化：使能时钟
  * ================================================================== */
 static void MX_DMA_Init(void)
@@ -416,27 +443,11 @@ static void MX_GPIO_Init(void)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);  /* PA4，注意改为GPIOA */
 
     /*
-     * Nokia 5110 LCD 控制引脚 → 推挽输出
-     *   PB10 = CE (片选), PA12 = RST (复位), PA15 = DC (数据/命令)
-     *   PA5 = CLK, PA11 = DIN (软件 SPI 位操作，非硬件外设)
+     * 按键 (PA5/PA11/PA12) → 下拉输入
      */
-    GPIO_InitStruct.Pin = LCD_SCE_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(LCD_SCE_GPIO_Port, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = LCD_RST_Pin | LCD_DC_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(LCD_RST_GPIO_Port, &GPIO_InitStruct);
-
-    /* PA5(CLK) + PA11(DIN) → 推挽输出 */
-    GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_11;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Pin = BTN_UP_Pin | BTN_DOWN_Pin | BTN_OK_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 

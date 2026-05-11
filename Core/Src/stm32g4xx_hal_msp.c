@@ -69,12 +69,6 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    /* PA10 = 按键 ADC (电阻分压三键) */
-    GPIO_InitStruct.Pin = GPIO_PIN_10;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
     /*
      * 配置 DMA1_Channel1：ADC1 → 内存
      * --------------------------------
@@ -213,6 +207,30 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim)
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     GPIO_InitStruct.Alternate = GPIO_AF6_TIM1;
     HAL_GPIO_Init(PWM_BKIN_GPIO_Port, &GPIO_InitStruct);
+}
+
+/* ==================================================================
+ *  I2C2 MSP 初始化 (SSD1306 OLED)
+ * ================================================================== */
+void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    if (hi2c->Instance != I2C2) return;
+
+    __HAL_RCC_I2C2_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    /*
+     * PB10 = SCL, PB11 = SDA
+     * 复用开漏输出 (AF_OD)、外部上拉 4.7kΩ 到 3.3V
+     */
+    GPIO_InitStruct.Pin = OLED_I2C_SCL_Pin | OLED_I2C_SDA_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
 /* ==================================================================
