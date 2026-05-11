@@ -67,8 +67,8 @@
  */
 #define SPWM_DEADTIME_NS                1000UL
 
-/* 软启动时间：3 秒内调制幅度限制在 PID_OUT_START_LIMIT (76%) */
-#define SPWM_SOFTSTART_MS               3000UL
+/* 软启动时间：5 秒内调制幅度限制在 PID_OUT_START_LIMIT (50%)，感性负载需要更长励磁时间 */
+#define SPWM_SOFTSTART_MS               5000UL
 
 /* 继电器延时：输出电压稳定后再吸合，避免带载切换 */
 #define SPWM_RELAY_DELAY_MS             800UL
@@ -139,11 +139,11 @@
  *  第 4 节：保护时间常数 (单位：ms，除非特别说明)
  * ================================================================== */
 
-/* 启动电流屏蔽：启动后 250 ms 内不检测过载（避开励磁浪涌） */
-#define STARTUP_CURRENT_BLANK_MS        250UL
+/* 启动电流屏蔽：启动后 1000 ms 内不检测过载（感性负载励磁浪涌持续时间更长） */
+#define STARTUP_CURRENT_BLANK_MS        1000UL
 
-/* 过载延时：连续过载 1.5 秒后保护，避免瞬时负载波动误触发 */
-#define OVERLOAD_TRIP_MS                1500UL
+/* 过载延时：连续过载 3 秒后保护，给感性负载足够的电流稳定时间 */
+#define OVERLOAD_TRIP_MS                3000UL
 
 /* 过载恢复：电流回落 500 ms 后清零过载计时器 */
 #define OVERLOAD_RECOVER_MS             500UL
@@ -189,12 +189,12 @@
 #define PID_I_MIN                       (-240000L)
 #define PID_I_MAX                       (240000L)
 #define PID_OUT_MIN                     0
-#define PID_OUT_START_LIMIT             760     /* 76%：软启动期间调制上限 */
+#define PID_OUT_START_LIMIT             500     /* 50%：感性负载从低电压起步，减少励磁冲击 */
 #define PID_OUT_RUN_LIMIT               930     /* 93%：正常运行调制上限 */
 
 /* PID 输出斜率限制：防止电压突变 */
-#define PID_SLEW_PER_MS_START           2       /* 软启动：每 ms 最多 +2 */
-#define PID_SLEW_PER_MS_RUN             5       /* 正常运行：每 ms 最多 +5（下降不限速） */
+#define PID_SLEW_PER_MS_START           1       /* 软启动：每 ms 最多 +1（感性负载慢爬升） */
+#define PID_SLEW_PER_MS_RUN             5       /* 正常运行：每 ms 最多 +5 */
 
 /* ==================================================================
  *  第 6 节：GPIO 引脚映射
@@ -216,16 +216,16 @@
 #define RELAY_GPIO_Port                 GPIOB
 #define RELAY_Pin                       GPIO_PIN_5
 
-/* 50/60 Hz 选择 (PB1)：输入，高电平 = 60 Hz */
+/* 50/60 Hz 选择：LQFP32封装无PB1，改用PB3 */
 #define FREQ_SEL_GPIO_Port              GPIOB
-#define FREQ_SEL_Pin                    GPIO_PIN_1
+#define FREQ_SEL_Pin                    GPIO_PIN_3
 
-/* SPWM 模式选择 (PB2)：输入，高电平 = 双极性 */
+/* SPWM 模式选择：LQFP32封装无PB2，改用PB4 */
 #define MODE_SEL_GPIO_Port              GPIOB
-#define MODE_SEL_Pin                    GPIO_PIN_2
+#define MODE_SEL_Pin                    GPIO_PIN_4
 
-/* 短路信号输入 (PB4)：外部比较器输出送 MCU 用于软件状态机 */
-#define SHORT_MCU_GPIO_Port             GPIOB
+/* 短路信号输入：PB4已分配给MODE_SEL，改用PA4 */
+#define SHORT_MCU_GPIO_Port             GPIOA
 #define SHORT_MCU_Pin                   GPIO_PIN_4
 
 /* TIM1_PWM 输出引脚（AF6） */

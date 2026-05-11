@@ -403,17 +403,17 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PB1(频率选择) + PB2(模式选择) → 下拉输入 */
+    /* PB3(频率选择) + PB4(模式选择) → 下拉输入（LQFP32无PB1/PB2） */
     GPIO_InitStruct.Pin = FREQ_SEL_Pin | MODE_SEL_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PB4(外部短路信号) → 下拉输入 */
+    /* PA4(外部短路信号) → 下拉输入（PB4已移至MODE_SEL） */
     GPIO_InitStruct.Pin = SHORT_MCU_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);  /* PA4，注意改为GPIOA */
 }
 
 /* ==================================================================

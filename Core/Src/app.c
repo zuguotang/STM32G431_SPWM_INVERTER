@@ -143,8 +143,9 @@ static void control_task_1ms(void)
      * STM8S 直接减少 out 值，而这里减少 PID out_limit。
      * 效果相似：都是限制调制幅度来限流。
      */
+    /* 感性负载过流时每 ms 降 120（原 80），更快压低励磁涌流 */
     if ((s_start_ms < SPWM_SOFTSTART_MS) && (g_adc.iout > IOUT_ADC_OVERLOAD)) {
-        limit = (limit > 80) ? (int16_t)(limit - 80) : limit;  /* 每次降 80 */
+        limit = (limit > 120) ? (int16_t)(limit - 120) : limit;
         slew = 1;
     }
 
