@@ -414,6 +414,30 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);  /* PA4，注意改为GPIOA */
+
+    /*
+     * Nokia 5110 LCD 控制引脚 → 推挽输出
+     *   PB10 = CE (片选), PA12 = RST (复位), PA15 = DC (数据/命令)
+     *   PA5 = CLK, PA11 = DIN (软件 SPI 位操作，非硬件外设)
+     */
+    GPIO_InitStruct.Pin = LCD_SCE_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(LCD_SCE_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = LCD_RST_Pin | LCD_DC_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(LCD_RST_GPIO_Port, &GPIO_InitStruct);
+
+    /* PA5(CLK) + PA11(DIN) → 推挽输出 */
+    GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_11;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 /* ==================================================================

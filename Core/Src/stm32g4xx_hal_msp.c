@@ -63,9 +63,16 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc)
      *   模拟模式、无上下拉（高阻态）。
      *   不需要配置速度（模拟引脚不涉及数字切换）。
      */
+    /* PA0~PA3 = ADC IN1~IN4 (电压/电流/温度/母线) */
     GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* PA10 = 按键 ADC (电阻分压三键) */
+    GPIO_InitStruct.Pin = GPIO_PIN_10;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /*

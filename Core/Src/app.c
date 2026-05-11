@@ -17,6 +17,10 @@
 #include "pid.h"
 #include "protection.h"
 #include "spwm.h"
+#include "param_store.h"
+#include "lcd_nokia5110.h"
+#include "lcd_menu.h"
+#include "button.h"
 
 static pid_q10_t s_voltage_pid;    /* 电压环 PID 控制器 */
 static uint32_t s_start_ms;        /* 启动计时器（从 0 到 SPWM_SOFTSTART_MS） */
@@ -62,7 +66,10 @@ void app_init(void)
     /* 1. 初始化输出为安全状态（LED灭，风扇停，继电器断） */
     board_init_outputs();
 
-    /* 2. 初始化 PID 参数（从 inverter_config.h 加载） */
+    /* 1.5 从 Flash 加载运行时参数（必须在 pid_init 之前！） */
+    param_store_init();
+
+    /* 2. 初始化 PID 参数（从 g_params 加载，已由 param_store_init 赋值） */
     pid_init(&s_voltage_pid);
 
     /* 3. 初始化 SPWM 运行时参数，设置死区 */
@@ -95,6 +102,11 @@ void app_init(void)
 
     /* 8. 启动 TIM6 1 ms 时基中断 */
     HAL_TIM_Base_Start_IT(&htim6);
+
+    /* 8.5 初始化 LCD + 按键 + 菜单 */
+    lcd_init();
+    button_init();
+    menu_init();
 
     /*
      * 9. 延时 50 ms 等待电源和 ADC 稳定，
@@ -210,5 +222,15 @@ void app_task_1ms(void)
         if (g_fault == FAULT_NONE) {
             debug_uart_print_status();
         }
+    }
+
+    /*
+     * 任务 6：按键扫描 + LCD 菜单
+     *   按键消抖 (~10us) + 菜单状态机 (~50us) + LCD DMA tick (~10us)
+     */
+    button_scan_1ms();
+    menu_task_1ms();
+    if (lcd_is_busy()) {
+        lcd_refresh_tick_1ms();
     }
 }
