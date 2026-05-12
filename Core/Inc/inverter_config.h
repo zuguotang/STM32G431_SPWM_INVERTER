@@ -233,8 +233,14 @@
 #define SPWM_DEADTIME_NS                (g_params.deadtime_ns)
 /* 软启动时间 (ms)，默认 5000 */
 #define SPWM_SOFTSTART_MS               (g_params.softstart_ms)
-/* 输出电压 ADC 目标值，默认 2480 */
-#define VOUT_ADC_TARGET_220V            (g_params.vout_target_adc)
+/*
+ * 输出电压 → ADC RMS 转换系数
+ * 例：220V 输出经分压 → ADC RMS ≈ 2750，则系数 ≈ 12.5
+ * 校准：万用表测 220V 时记下 OLED 显示的 RMS ADC 值，除以 220
+ */
+#define VOUT_RMS_PER_VOLT              125    /* ×10 定点，125=12.5 */
+/* 电压目标 V → ADC RMS 码值（用于宏展开，LED 读的是 ADC RMS） */
+#define VOUT_ADC_TARGET_220V            ((uint16_t)((uint32_t)(g_params.vout_target_v) * VOUT_RMS_PER_VOLT / 10U))
 /* PID Kp (Q10 格式)，默认 260 */
 #define PID_KP_Q10                      ((int32_t)(g_params.pid_kp_q10))
 /* PID Ki (Q10 格式)，默认 10 */

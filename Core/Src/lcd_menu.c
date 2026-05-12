@@ -44,7 +44,7 @@ typedef struct {
 static menu_item_t s_menu_items[MI_COUNT] = {
     [MI_DEADTIME]       = {"Dead Time",   "ns", &g_params.deadtime_ns,      500, 5000,  50, 200, 0 },
     [MI_SOFTSTART]      = {"Soft Start",  "s",  &g_params.softstart_ms,     1000,30000, 100,1000,0 },
-    [MI_VOUT_TARGET]    = {"Vout Target", "",   &g_params.vout_target_adc,  0,   4095,  10, 50,  0 },
+    [MI_VOUT_TARGET]    = {"Vout",        "V",  &g_params.vout_target_v,    100, 260,   1,  5,   0 },
     [MI_PID_KP]         = {"PID Kp",      "",   &g_params.pid_kp_q10,       0,   1023,  5,  20,  10},
     [MI_PID_KI]         = {"PID Ki",      "",   &g_params.pid_ki_q10,       0,   255,   1,  5,   10},
     [MI_OVERLOAD_TRIP]  = {"Ovl Trip",    "ms", &g_params.overload_trip_ms, 100, 10000, 100,500,0 },

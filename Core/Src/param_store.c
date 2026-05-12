@@ -20,7 +20,7 @@
 /* 编译期默认值 */
 #define DFLT_DEADTIME_NS        1000
 #define DFLT_SOFTSTART_MS       5000
-#define DFLT_VOUT_TARGET_ADC    2480
+/* DFLT_VOUT_TARGET_ADC removed -- now stored as actual volts in g_params.vout_target_v */
 #define DFLT_PID_KP_Q10         260
 #define DFLT_PID_KI_Q10         10
 #define DFLT_OVERLOAD_TRIP_MS   3000
@@ -93,7 +93,7 @@ void param_store_load_defaults(void)
     g_params.version  = 1;
     g_params.deadtime_ns      = DFLT_DEADTIME_NS;
     g_params.softstart_ms     = DFLT_SOFTSTART_MS;
-    g_params.vout_target_adc  = DFLT_VOUT_TARGET_ADC;
+    g_params.vout_target_v    = 220;  /* 默认 220V */
     g_params.pid_kp_q10       = DFLT_PID_KP_Q10;
     g_params.pid_ki_q10       = DFLT_PID_KI_Q10;
     g_params.overload_trip_ms = DFLT_OVERLOAD_TRIP_MS;

@@ -26,7 +26,7 @@ typedef struct {
     /* 可调参数（物理单位） */
     uint16_t deadtime_ns;       /* 死区时间 ns (500..5000) */
     uint16_t softstart_ms;      /* 软启动时间 ms (1000..30000) */
-    uint16_t vout_target_adc;   /* 输出电压 ADC 目标 (0..4095) */
+    uint16_t vout_target_v;     /* 输出电压目标 (V), 如220=220V */
     uint16_t pid_kp_q10;        /* PID Kp Q10 (0..10230) */
     uint16_t pid_ki_q10;        /* PID Ki Q10 (0..1023) */
     uint16_t overload_trip_ms;  /* 过载延时 ms (100..10000) */
