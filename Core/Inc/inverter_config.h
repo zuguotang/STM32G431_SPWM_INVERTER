@@ -37,6 +37,35 @@
 /* 继电器延时：输出电压稳定后再吸合，避免带载切换 */
 #define SPWM_RELAY_DELAY_MS             800UL
 
+/*
+ * 系统电压平台选择（编译开关）
+ *   HV (0): 高压母线（如 310V DC → 220V AC）
+ *   LV (1): 低压母线（如 12V/24V DC → 220V AC，经前级升压）
+ *
+ * 选择不同平台时，ADC 标定系数和阈值自动切换。
+ */
+#define HV  0
+#define LV  1
+#define SYSVOLT  (HV)  /* ← 在此切换 */
+
+/* ==================================================================
+ *  ADC → 物理量标定系数
+ *
+ *  计算公式：物理值 = ADC值 × FACTOR / 4095
+ *  刻度量纲：电压 ×100（如 22000 = 220.00V），电流 ×100（如 500 = 5.00A）
+ * ================================================================== */
+#if (SYSVOLT == LV)
+#define VOLT_RMS_FACTOR     22132UL   /* 低压版电压标定: 220V → ADC≈2480 时的系数 */
+#define CURR_RMS_FACTOR     19970UL   /* 低压版电流标定 */
+#define VBUS_FACTOR         17705UL   /* 低压版母线标定 */
+#define POWER_FACTOR        132UL
+#else
+#define VOLT_RMS_FACTOR     22132UL   /* 高压版电压标定 */
+#define CURR_RMS_FACTOR     19970UL   /* 高压版电流标定 */
+#define VBUS_FACTOR         88528UL   /* 高压版母线标定 (分压比大) */
+#define POWER_FACTOR        132UL
+#endif
+
 /* ==================================================================
  *  第 2 节：DDS 相位步进（编译期固定）
  * ================================================================== */
@@ -63,9 +92,10 @@
 #define IOUT_ADC_OVERLOAD               3040U     /* 100% 基线 */
 #define IOUT_ADC_OVERLOAD_LV2_PCT       110U      /* 110% */
 #define IOUT_ADC_OVERLOAD_LV3_PCT       120U      /* 120% */
-#define TEMP_ADC_FAN_ON                 2480U
-#define TEMP_ADC_OVER                   3040U
-#define TEMP_ADC_RECOVER                2760U
+/* 温度阈值（实际 ℃×10，如 600 = 60.0℃），使用 NTC 查表转换 */
+#define TEMP_FAN_ON_CELSIUS             400    /* 40.0℃ 开风扇 */
+#define TEMP_OVER_CELSIUS               600    /* 60.0℃ 过温保护 */
+#define TEMP_RECOVER_CELSIUS            500    /* 50.0℃ 恢复 */
 
 #define ADC_FILTER_SHIFT_FAST           2U
 #define ADC_FILTER_SHIFT_SLOW           3U

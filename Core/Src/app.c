@@ -45,7 +45,7 @@ static void inverter_start_if_ready(void)
      * 条件不满足 → 锁存母线欠压故障
      */
     if ((g_adc.vbus > VBUS_ADC_MIN_RUN) && (g_adc.vbus < VBUS_ADC_MAX_RUN) &&
-        (g_adc.temp < TEMP_ADC_OVER) && !board_short_input_active()) {
+        (g_adc.temp_celsius < TEMP_OVER_CELSIUS) && !board_short_input_active()) {
         protection_reset_for_start();
         pid_reset(&s_voltage_pid);
         s_start_ms = 0;
@@ -187,10 +187,12 @@ static void control_task_1ms(void)
 void app_task_1ms(void)
 {
     /*
-     * 任务 1：ADC 采样 + 低通滤波
+     * 任务 1：ADC 采样 + 低通滤波 + RMS 有效值计算
      *   从 DMA 缓冲读取四通道原始值，更新 g_adc 滤波值
+     *   adc_calc_rms_1ms() 累积 800 个采样点后更新 RMS 电压/电流/功率
      */
     adc_sample_filtered_1ms();
+    adc_calc_rms_1ms();
 
     /*
      * 任务 2：读取频率/模式 IO 并更新 SPWM 设置

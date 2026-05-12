@@ -88,26 +88,33 @@ static void render_main_screen(void)
     ssd1306_fill_rect(0, 0, 128, 10, true);
     ssd1306_draw_string(18, 2, "INVERTER V2.0");
 
-    /* 行 1: 输出状态 */
-    uint8_t vout_pct = (uint8_t)((uint32_t)g_adc.vout * 100 / 4095);
-    snprintf(line, sizeof(line), "Vo:%02u%% Io:%04u %s",
-             (unsigned)vout_pct, (unsigned)g_adc.iout,
-             g_spwm_enabled ? "RUN" : "STOP");
+    /* 行 1: RMS 电压 + 电流 */
+    uint16_t volt_disp = g_adc.rms_volt / 100;  /* 220.00V → 220 */
+    uint16_t curr_disp = g_adc.rms_curr;        /* ×100, 如 500 = 5.00A */
+    snprintf(line, sizeof(line), "Vo:%3uV Io:%u.%02uA %s",
+             (unsigned)volt_disp,
+             (unsigned)(curr_disp / 100), (unsigned)(curr_disp % 100),
+             g_spwm_enabled ? "ON" : "OFF");
     ssd1306_draw_string(0, 13, line);
 
-    /* 行 2: 频率 + 模式 */
-    snprintf(line, sizeof(line), "%s  %s",
+    /* 行 2: 功率 + 频率/模式 */
+    snprintf(line, sizeof(line), "P:%3uW %s %s",
+             (unsigned)g_adc.power,
              board_frequency_is_60hz() ? "60Hz" : "50Hz",
-             board_read_spwm_mode() == SPWM_MODE_BIPOLAR ? "BIPOLAR" : "UNIPOLAR");
+             board_read_spwm_mode() == SPWM_MODE_BIPOLAR ? "BI" : "UNI");
     ssd1306_draw_string(0, 22, line);
 
-    /* 行 3: 母线 + 温度 */
-    snprintf(line, sizeof(line), "Vbus:%04u  Temp:%04u",
-             (unsigned)g_adc.vbus, (unsigned)g_adc.temp);
+    /* 行 3: 母线 + 温度（℃） */
+    int16_t temp_disp = g_adc.temp_celsius;  /* ×10, 如 255 = 25.5℃ */
+    snprintf(line, sizeof(line), "Vbus:%04u T:%c%d.%dC",
+             (unsigned)g_adc.vbus,
+             (temp_disp < 0) ? '-' : ' ',
+             (unsigned)(temp_disp >= 0 ? temp_disp / 10 : (-temp_disp) / 10),
+             (unsigned)(temp_disp >= 0 ? temp_disp % 10 : (-temp_disp) % 10));
     ssd1306_draw_string(0, 31, line);
 
     /* 行 4: 调制幅度 */
-    snprintf(line, sizeof(line), "Amp: %03u / 1000", (unsigned)g_spwm_amp);
+    snprintf(line, sizeof(line), "Amp: %03u/1000", (unsigned)g_spwm_amp);
     ssd1306_draw_string(0, 40, line);
 
     /* 行 5: 故障状态或正常 */

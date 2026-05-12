@@ -99,43 +99,38 @@ static uint16_t limit_ccr(int32_t value)
 }
 
 /* ==================================================================
- *  DDS 正弦计算（与 STM8S 版本算法完全一致）
+ *  DDS 正弦计算（线性插值版，提升 THD 性能）
+ *
+ * 257 点 Q1.10 正弦表 (0..1000)，分辨率 0.35°/step。
+ * 通过 8 位小数插值，等效分辨率 ≈ 0.0014°。
+ *
+ * 位域：
+ *   bit31..30 → 象限 (0=I, 1=II, 2=III, 3=IV)
+ *   bit29..22 → 表索引 (0..255)
+ *   bit21..14 → 插值小数 (0..255, 1/256 步进)
  * ================================================================== */
 static int16_t sine_from_phase(uint32_t phase)
 {
-    /*
-     * 位域解码：
-     *   phase bit31..30 → quadrant (0=I, 1=II, 2=III, 3=IV)
-     *   phase bit29..22 → 查表索引 (0..255)
-     *
-     * 象限反射：
-     *   I   (0→90°)  : +sin(θ)，正向查表
-     *   II  (90→180°): +sin(θ)，反向查表
-     *   III (180→270°): -sin(θ)，正向查表取负
-     *   IV  (270→360°): -sin(θ)，反向查表取负
-     *
-     * 返回值范围：-1000 .. +1000（Q1.10 千分比）
-     */
-    uint16_t idx = (uint16_t)(phase >> 22);
-    uint8_t quadrant = (uint8_t)(idx >> 8);
-    uint8_t offset = (uint8_t)(idx & 0xFFU);
-    uint16_t value;
+    uint8_t idx  = (uint8_t)((phase >> 22) & 0xFFU);   /* 表索引 0..255 */
+    uint8_t frac = (uint8_t)((phase >> 14) & 0xFFU);   /* 插值小数 0..255 */
+    uint8_t quad = (uint8_t)(phase >> 30);              /* 象限 0..3 */
+    uint16_t y0, y1;
+    int32_t value;
 
-    if (quadrant == 0U) {
-        value = qsin_0_90[offset];
-        return (int16_t)value;
-    }
-    if (quadrant == 1U) {
-        value = qsin_0_90[256U - offset];
-        return (int16_t)value;
-    }
-    if (quadrant == 2U) {
-        value = qsin_0_90[offset];
-        return -(int16_t)value;
+    if ((quad & 1U) == 0U) {
+        /* 正向查表（象限 I, III）：sin 上升 */
+        y0 = qsin_0_90[idx];
+        y1 = qsin_0_90[idx + 1U];                      /* idx<256，安全 */
+        value = (int32_t)y0 + (((int32_t)(y1 - y0) * (int32_t)frac) >> 8);
+    } else {
+        /* 反向查表（象限 II, IV）：sin 下降 */
+        uint8_t ridx = (uint8_t)(256U - idx);
+        y0 = qsin_0_90[ridx];
+        y1 = qsin_0_90[ridx - 1U];                     /* 反向插值 */
+        value = (int32_t)y0 + (((int32_t)(y1 - y0) * (int32_t)frac) >> 8);
     }
 
-    value = qsin_0_90[256U - offset];
-    return -(int16_t)value;
+    return (quad < 2U) ? (int16_t)value : (int16_t)(-value);
 }
 
 /* ==================================================================

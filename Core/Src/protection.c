@@ -139,21 +139,10 @@ void protection_short_hw_event(void)
  * ================================================================== */
 static void fan_task(void)
 {
-    /*
-     * 温度回差控制：
-     *   TEMP > TEMP_ADC_FAN_ON   → 开风扇
-     *   TEMP < TEMP_ADC_RECOVER  → 关风扇
-     *
-     * 回差 = 2480 - 2760 = -280（注意方向：FAN_ON 620 是运行阈值，
-     * RECOVER 690 是关闭阈值，两者之间保持当前状态）。
-     *
-     * 实际上看代码：FAN_ON=2480, RECOVER=2760。
-     * temp > 2480 → 开；temp < 2760 → 关。
-     * 中间 200 个码值保持当前状态，防止频繁启停。
-     */
-    if (g_adc.temp > TEMP_ADC_FAN_ON) {
+    /* 使用实际温度 ℃ 替代原始 ADC 值 */
+    if (g_adc.temp_celsius > TEMP_FAN_ON_CELSIUS) {
         board_fan_set(true);
-    } else if (g_adc.temp < TEMP_ADC_RECOVER) {
+    } else if (g_adc.temp_celsius < TEMP_RECOVER_CELSIUS) {
         board_fan_set(false);
     }
 }
@@ -185,7 +174,7 @@ static void short_retry_task(void)
      * 条件不满足 → 继续等待（回退计时器，100 ms 后再检）
      */
     if ((g_adc.vbus > VBUS_ADC_MIN_RUN) && (g_adc.vbus < VBUS_ADC_MAX_RUN) &&
-        (g_adc.temp < TEMP_ADC_RECOVER) && !board_short_input_active()) {
+        (g_adc.temp_celsius < TEMP_RECOVER_CELSIUS) && !board_short_input_active()) {
         clear_non_latched_fault();
         s_short_waiting_retry = false;
         spwm_clear_break_pending();
@@ -267,10 +256,10 @@ void protection_task_1ms(void)
     }
 
     /*
-     * 任务 8：过温检测
+     * 任务 8：过温检测（使用实际 ℃）
      *   立即锁存（不延时）。功率器件过热可瞬间损坏。
      */
-    if (g_adc.temp > TEMP_ADC_OVER) {
+    if (g_adc.temp_celsius > TEMP_OVER_CELSIUS) {
         protection_latch_fault(FAULT_OVER_TEMP);
         return;
     }
