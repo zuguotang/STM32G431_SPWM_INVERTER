@@ -59,10 +59,11 @@
 #define VBUS_RELAY_STARTUP_DELAY_MS 500U    /* 上电后延时，等母线电容充电稳定 */
 
 /*
- * 母线电压运行窗口（比继电器窗口略宽，用于启动条件判断）
+ * 母线电压运行窗口（与继电器窗口一致：310~450V）
+ * 继电器短接/bypass 时，SPWM 仍按此窗口独立保护。
  */
-#define VBUS_RUN_MIN_V              300     /* 逆变运行最低母线电压 (V) */
-#define VBUS_RUN_MAX_V              460     /* 逆变运行最高母线电压 (V) */
+#define VBUS_RUN_MIN_V              310     /* 逆变运行最低母线电压 (V) */
+#define VBUS_RUN_MAX_V              450     /* 逆变运行最高母线电压 (V) */
 
 /* 母线电压阈值 → 自动换算为 ADC 码值 */
 #define VBUS_RELAY_ON_MIN       VBUS_V_TO_ADC(VBUS_RELAY_ON_V)
