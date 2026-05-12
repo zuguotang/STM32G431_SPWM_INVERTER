@@ -27,35 +27,43 @@ static uint32_t s_start_ms;        /* 启动计时器（从 0 到 SPWM_SOFTSTART
 static uint32_t s_relay_ms;        /* 继电器延时计时器 */
 static uint16_t s_status_ms;       /* 串口状态输出间隔计时器 */
 
-bool g_relay_startup_ok = false;   /* 上电延时完成标志（供 protection.c 的 bus_relay_task 使用） */
+bool g_relay_startup_ok = false;   /* 上电延时完成（供 bus_relay_task 用） */
+bool g_relay_engaged = false;       /* 继电器已吸合（bus_relay_task 置位） */
+
+bool g_system_ready = false;        /* 基础条件满足（供 protection.c 短路重试使用） */
+static bool s_spwm_started = false; /* SPWM 已启动（避免重复触发） */
 
 /* ==================================================================
- *  首次启动尝试
+ *  启动条件检查（不立即启动，等继电器吸合后再启动 SPWM）
+ *
+ *  时序：
+ *    上电 → 条件检查(本函数) → 延时 → 继电器吸合 → 软启动
+ *
+ *            inverter_start_if_ready()     bus_relay_task()     control_task_1ms()
+ *            ├─ Vbus 在运行窗口?          ├─ Vbus 在继电器窗口?  ├─ relay engaged?
+ *            ├─ 温度正常?                 ├─ 延时到?            ├─ 启动 SPWM
+ *            ├─ 无短路?                   ├─ 吸合继电器         └─ 开始软启动
+ *            └─ 置 g_system_ready=true     └─ 置 g_relay_engaged
  * ================================================================== */
 static void inverter_start_if_ready(void)
 {
-    /* 获取当前 ADC 采样值 */
     adc_sample_filtered_1ms();
 
-    /*
-     * 启动条件：
-     *   1. 母线电压在正常范围内
-     *   2. 温度低于过温阈值
-     *   3. 外部短路信号未激活
-     *
-     * 条件满足 → 复位保护/PID 状态 → 从零幅度开始 → 开启 PWM
-     * 条件不满足 → 锁存母线欠压故障
-     */
     if ((g_adc.vbus > VBUS_ADC_MIN_RUN) && (g_adc.vbus < VBUS_ADC_MAX_RUN) &&
         (g_adc.temp_celsius < TEMP_OVER_CELSIUS) && !board_short_input_active()) {
+        /*
+         * 基础条件满足，但不立即启动 SPWM。
+         * 等 bus_relay_task 吸合继电器后再触发软启动。
+         */
         protection_reset_for_start();
         pid_reset(&s_voltage_pid);
         s_start_ms = 0;
         s_relay_ms = 0;
-        g_relay_startup_ok = false;        /* 重新开始上电延时 */
-        g_spwm_amp = 0;                    /* 从零开始软启动 */
-        spwm_outputs_on();
-        debug_uart_print("SPWM START\r\n");
+        g_relay_startup_ok = false;
+        g_system_ready = true;     /* 通知 bus_relay_task：系统就绪，可以吸合 */
+        s_spwm_started = false;
+        g_spwm_amp = 0;
+        debug_uart_print("SYSTEM READY, wait relay...\r\n");
     } else {
         protection_latch_fault(FAULT_UNDER_BUS);
     }
@@ -123,23 +131,65 @@ void app_init(void)
 
 /* ==================================================================
  *  PID 控制任务
+ *
+ *  启动时序（严格保证）：
+ *    1. g_system_ready = true     → 基础条件检查通过
+ *    2. s_relay_ms 计时到         → g_relay_startup_ok = true
+ *    3. bus_relay_task 吸合继电器  → g_relay_engaged = true
+ *    4. 本函数检测到 relay 吸合   → spwm_outputs_on() → 软启动开始
  * ================================================================== */
 static void control_task_1ms(void)
 {
     int16_t limit;
     int16_t slew;
 
-    /* PWM 未使能时跳过控制，同时复位继电器状态 */
+    /*
+     * 阶段 0：等待继电器吸合。
+     *   独立于 g_spwm_enabled 判断——即使 SPWM 未使能，只要基础条件
+     *   已通过 (g_system_ready)，就累计延时等继电器。继电器吸合后
+     *   才启动 SPWM，保证时序严格。
+     *
+     *   短路恢复场景：spwm_outputs_on 使能了 SPWM，但 s_spwm_started
+     *   为 false → 走这里重新等继电器。
+     */
+    if (!s_spwm_started && g_system_ready) {
+
+        /* 累计上电延时（SPWM 未使能时也要计时） */
+        if (s_relay_ms < VBUS_RELAY_STARTUP_DELAY_MS) {
+            s_relay_ms++;
+        } else {
+            g_relay_startup_ok = true;
+        }
+
+        /* 继电器吸合 → 启动 SPWM 软启动 */
+        if (g_relay_engaged) {
+            s_spwm_started = true;
+            g_spwm_amp = 0;
+            spwm_outputs_on();
+            debug_uart_print("RELAY ON, SPWM SOFTSTART\r\n");
+            return;
+        }
+        return;
+    }
+
+    /* SPWM 未使能且系统未就绪（故障/停止/首次上电等待检查） */
+    if (!g_spwm_enabled && !g_system_ready) {
+        return;
+    }
+
+    /* SPWM 被关闭（故障），复位所有启动标志 */
     if (!g_spwm_enabled) {
         g_relay_startup_ok = false;
+        g_relay_engaged = false;
         s_relay_ms = 0;
+        s_spwm_started = false;
+        g_system_ready = false;
         return;
     }
 
     /*
-     * 根据启动阶段选择 PID 参数：
-     *   软启动阶段：输出上限 760 (76%)、斜率 2/ms
-     *   正常阶段：输出上限 930 (93%)、斜率 5/ms
+     * 阶段 1 & 2：软启动 + 正常运行
+     *   根据启动阶段选择 PID 参数
      */
     if (s_start_ms < SPWM_SOFTSTART_MS) {
         limit = PID_OUT_START_LIMIT;

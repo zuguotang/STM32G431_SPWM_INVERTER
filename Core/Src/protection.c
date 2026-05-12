@@ -150,45 +150,41 @@ static void fan_task(void)
 /* ==================================================================
  *  母线电压窗口继电器管理
  *
- *  继电器用于母线侧（预充电旁路/直流接触器），而非交流输出侧。
+ *  继电器用于母线侧管理（预充电旁路/直流接触器）。
+ *  吸合后置 g_relay_engaged=true，通知 app.c 启动 SPWM 软启动。
  *
  *  吸合条件（全部满足）：
- *    1. 无故障 (g_fault == FAULT_NONE)
- *    2. SPWM 已使能 (g_spwm_enabled)
- *    3. 上电延时已过 (s_relay_startup_ok, 由 app.c 设置)
- *    4. Vbus ∈ [VBUS_RELAY_ON_MIN, VBUS_RELAY_ON_MAX]
+ *    1. 系统就绪 (g_system_ready, 由 app.c 的 inverter_start_if_ready 设置)
+ *    2. 无故障 (g_fault == FAULT_NONE)
+ *    3. 上电延时已过 (g_relay_startup_ok)
+ *    4. Vbus ∈ [310V, 450V] — 窗口由 VBUS_RELAY_ON_V/VBUS_RELAY_OFF_HIGH_V 定义
+ *
+ *  启动时序：
+ *    上电 → 条件检查 → 延时 → 继电器吸合 → g_relay_engaged → SPWM 软启动
  *
  *  断开条件（任一满足）：
- *    1. Vbus 超出窗口
+ *    1. Vbus 超出 310~450V 窗口
  *    2. 任何故障（已由 spwm_outputs_off 处理）
- *    3. SPWM 未使能
- *
- *  外部变量：g_relay_startup_ok（app.c 中定义，上电延时后置 true）
- *
- *  设计意图：
- *    400V 母线系统在电容预充电完成前 Vbus < 310V → 继电器不吸合
- *    过压 > 450V → 继电器断开，保护后级
- *    故障时 spwm_outputs_off() 会调 board_relay_set(false)，这里再次确保
  * ================================================================== */
-extern bool g_relay_startup_ok;  /* app.c 中定义 */
+extern bool g_relay_startup_ok;  /* app.c: 上电延时完成 */
+extern bool g_relay_engaged;     /* app.c: 继电器吸合标志 */
+extern bool g_system_ready;      /* app.c: 基础条件就绪 */
 
 static void bus_relay_task(void)
 {
-    if (g_fault != FAULT_NONE) {
+    if (g_fault != FAULT_NONE || !g_relay_startup_ok) {
         board_relay_set(false);
+        g_relay_engaged = false;
         return;
     }
 
-    if (!g_spwm_enabled || !g_relay_startup_ok) {
-        board_relay_set(false);
-        return;
-    }
-
-    /* 母线电压窗口判断 */
+    /* 母线电压窗口判断（310V ~ 450V） */
     if (g_adc.vbus >= VBUS_RELAY_ON_MIN && g_adc.vbus <= VBUS_RELAY_ON_MAX) {
-        board_relay_set(true);   /* 电压在安全窗口内 → 吸合 */
+        board_relay_set(true);
+        g_relay_engaged = true;   /* 通知 app.c：继电器已吸合，可以软启动 */
     } else {
-        board_relay_set(false);  /* 电压超出窗口 → 断开 */
+        board_relay_set(false);
+        g_relay_engaged = false;
     }
 }
 
@@ -223,7 +219,7 @@ static void short_retry_task(void)
         clear_non_latched_fault();
         s_short_waiting_retry = false;
         spwm_clear_break_pending();
-        spwm_outputs_on();
+        g_system_ready = true;  /* 不直接开SPWM，走启动时序：延时→继电器→软启动 */
         debug_uart_print("SHORT RETRY\r\n");
     } else {
         s_short_retry_wait_ms = SHORT_RETRY_DELAY_MS - 100U;

@@ -35,55 +35,69 @@
 #define SPWM_DEFAULT_FREQ               AC_FREQ_50HZ
 
 /*
+ * 母线电压分压比与 ADC 转换
+ *
+ *   200:1 分压 → V_adc_pin = Vbus / 200
+ *   ADC = V_adc_pin / 3.3V × 4095 = Vbus × 4095 / 660
+ *
+ *   例：310V → ADC = 310×4095/660 = 1923
+ *        400V → ADC = 400×4095/660 = 2482
+ *        450V → ADC = 450×4095/660 = 2792
+ */
+#define BUS_VOLT_DIV_RATIO      200                       /* 分压比 N:1 */
+#define VBUS_V_TO_ADC(v)        ((uint16_t)((uint32_t)(v) * 4095UL / ((uint32_t)BUS_VOLT_DIV_RATIO * 33UL / 10UL)))
+
+/*
  * 继电器控制（母线电压窗口管理）
  *
- *   继电器用于母线侧管理（如预充电旁路/直流接触器），
- *   而非交流输出切断。仅在母线电压处于安全窗口内 + 无故障时吸合。
- *
- *   逻辑：Vbus ∈ [VBUS_RELAY_ON_MIN, VBUS_RELAY_ON_MAX] AND 无故障 → ON
- *          Vbus 超出窗口 OR 任何故障 → OFF
- *
- *   400V 母线系统默认值（HV 分压比约 3kΩ+500kΩ）：
- *     310V → ADC ≈ 2300,  450V → ADC ≈ 3340
- *   需在实际硬件上校准这两个值。
+ *   继电器用于母线侧管理（预充电旁路/直流接触器）。
+ *   Vbus ∈ [310V, 450V] AND 无故障 AND 延时到 → 吸合。
+ *   吸合后 → 才允许软启动。
  */
-#define VBUS_RELAY_ON_MIN               2300U   /* 继电器吸合最低母线电压 (ADC) */
-#define VBUS_RELAY_ON_MAX               3340U   /* 继电器吸合最高母线电压 (ADC) */
-#define VBUS_RELAY_STARTUP_DELAY_MS     500U    /* 上电后延时，等母线电容充电稳定 */
+#define VBUS_RELAY_ON_V             310     /* 继电器吸合最低电压 (V) */
+#define VBUS_RELAY_OFF_HIGH_V       450     /* 继电器断开最高电压 (V) */
+#define VBUS_RELAY_STARTUP_DELAY_MS 500U    /* 上电后延时，等母线电容充电稳定 */
+
+/*
+ * 母线电压运行窗口（比继电器窗口略宽，用于启动条件判断）
+ */
+#define VBUS_RUN_MIN_V              300     /* 逆变运行最低母线电压 (V) */
+#define VBUS_RUN_MAX_V              460     /* 逆变运行最高母线电压 (V) */
+
+/* 母线电压阈值 → 自动换算为 ADC 码值 */
+#define VBUS_RELAY_ON_MIN       VBUS_V_TO_ADC(VBUS_RELAY_ON_V)
+#define VBUS_RELAY_ON_MAX       VBUS_V_TO_ADC(VBUS_RELAY_OFF_HIGH_V)
+#define VBUS_ADC_MIN_RUN        VBUS_V_TO_ADC(VBUS_RUN_MIN_V)
+#define VBUS_ADC_MAX_RUN        VBUS_V_TO_ADC(VBUS_RUN_MAX_V)
 
 /*
  * 系统电压平台选择（编译开关）
  *
- *   HV (0): 高压母线 — 典型应用 310V DC 母线 → 220V AC 输出
- *            母线分压比大（如 3kΩ+500kΩ），ADC 读数小
- *   LV (1): 低压母线 — 典型应用 12V/24V 电池 → 前级推挽升压 → 220V AC
- *            母线分压比小（如 3kΩ+51kΩ），ADC 读数大
+ *   HV (0): 高压母线 — 典型 400V DC 母线 → 220V AC
+ *   LV (1): 低压母线 — 典型 12V/24V → 前级升压 → 220V AC
  *
- *  选择后自动切换：ADC 标定系数 (VOLT_RMS_FACTOR 等)
- *                  和母线电压分压系数 (VBUS_FACTOR)
- *
- *  注意：电流标定系数 (CURR_RMS_FACTOR) 取决于电流传感器硬件，
- *        与母线电压无关，LV/HV 可能相同。
+ *  注意：更换平台时需要同时检查 BUS_VOLT_DIV_RATIO 分压比！
+ *        LV 版分压比通常较小（3k+51k ≈ 18:1）
  */
 #define HV  0
 #define LV  1
-#define SYSVOLT  (HV)  /* ← 在此切换：0=高压版, 1=低压版 */
+#define SYSVOLT  (HV)  /* ← 在此切换 */
 
 /* ==================================================================
- *  ADC → 物理量标定系数
+ *  ADC → 物理量标定系数（RMS 有效值用）
  *
- *  计算公式：物理值 = ADC值 × FACTOR / 4095
- *  刻度量纲：电压 ×100（如 22000 = 220.00V），电流 ×100（如 500 = 5.00A）
+ *  物理值 = ADC × FACTOR / 4095
+ *  电压 ×100（220.00V → 22000），电流 ×100（5.00A → 500）
  * ================================================================== */
 #if (SYSVOLT == LV)
-#define VOLT_RMS_FACTOR     22132UL   /* 低压版电压标定: 220V → ADC≈2480 时的系数 */
-#define CURR_RMS_FACTOR     19970UL   /* 低压版电流标定 */
-#define VBUS_FACTOR         17705UL   /* 低压版母线标定 */
+#define VOLT_RMS_FACTOR     22132UL
+#define CURR_RMS_FACTOR     19970UL
+#define VBUS_FACTOR         17705UL
 #define POWER_FACTOR        132UL
 #else
-#define VOLT_RMS_FACTOR     22132UL   /* 高压版电压标定 */
-#define CURR_RMS_FACTOR     19970UL   /* 高压版电流标定 */
-#define VBUS_FACTOR         88528UL   /* 高压版母线标定 (分压比大) */
+#define VOLT_RMS_FACTOR     22132UL
+#define CURR_RMS_FACTOR     19970UL
+#define VBUS_FACTOR         88528UL
 #define POWER_FACTOR        132UL
 #endif
 
