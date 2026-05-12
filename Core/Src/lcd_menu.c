@@ -104,10 +104,11 @@ static void render_main_screen(void)
              board_read_spwm_mode() == SPWM_MODE_BIPOLAR ? "BI" : "UNI");
     ssd1306_draw_string(0, 22, line);
 
-    /* 行 3: 母线 + 温度（℃） */
-    int16_t temp_disp = g_adc.temp_celsius;  /* ×10, 如 255 = 25.5℃ */
-    snprintf(line, sizeof(line), "Vbus:%04u T:%c%d.%dC",
-             (unsigned)g_adc.vbus,
+    /* 行 3: 母线（V）+ 温度（℃） */
+    int16_t temp_disp = g_adc.temp_celsius;  /* ×10, 如 425 = 42.5℃ */
+    uint16_t vbus_v = (uint16_t)((uint32_t)g_adc.vbus * (BUS_VOLT_DIV_RATIO * 33UL / 10UL) / 4095UL);
+    snprintf(line, sizeof(line), "Vbus:%3uV T:%c%d.%dC",
+             (unsigned)vbus_v,
              (temp_disp < 0) ? '-' : ' ',
              (unsigned)(temp_disp >= 0 ? temp_disp / 10 : (-temp_disp) / 10),
              (unsigned)(temp_disp >= 0 ? temp_disp % 10 : (-temp_disp) % 10));
