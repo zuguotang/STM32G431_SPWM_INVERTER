@@ -34,8 +34,22 @@
 #define SPWM_DEFAULT_MODE               SPWM_MODE_UNIPOLAR
 #define SPWM_DEFAULT_FREQ               AC_FREQ_50HZ
 
-/* 继电器延时：输出电压稳定后再吸合，避免带载切换 */
-#define SPWM_RELAY_DELAY_MS             800UL
+/*
+ * 继电器控制（母线电压窗口管理）
+ *
+ *   继电器用于母线侧管理（如预充电旁路/直流接触器），
+ *   而非交流输出切断。仅在母线电压处于安全窗口内 + 无故障时吸合。
+ *
+ *   逻辑：Vbus ∈ [VBUS_RELAY_ON_MIN, VBUS_RELAY_ON_MAX] AND 无故障 → ON
+ *          Vbus 超出窗口 OR 任何故障 → OFF
+ *
+ *   400V 母线系统默认值（HV 分压比约 3kΩ+500kΩ）：
+ *     310V → ADC ≈ 2300,  450V → ADC ≈ 3340
+ *   需在实际硬件上校准这两个值。
+ */
+#define VBUS_RELAY_ON_MIN               2300U   /* 继电器吸合最低母线电压 (ADC) */
+#define VBUS_RELAY_ON_MAX               3340U   /* 继电器吸合最高母线电压 (ADC) */
+#define VBUS_RELAY_STARTUP_DELAY_MS     500U    /* 上电后延时，等母线电容充电稳定 */
 
 /*
  * 系统电压平台选择（编译开关）

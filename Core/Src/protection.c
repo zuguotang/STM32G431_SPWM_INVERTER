@@ -148,6 +148,51 @@ static void fan_task(void)
 }
 
 /* ==================================================================
+ *  母线电压窗口继电器管理
+ *
+ *  继电器用于母线侧（预充电旁路/直流接触器），而非交流输出侧。
+ *
+ *  吸合条件（全部满足）：
+ *    1. 无故障 (g_fault == FAULT_NONE)
+ *    2. SPWM 已使能 (g_spwm_enabled)
+ *    3. 上电延时已过 (s_relay_startup_ok, 由 app.c 设置)
+ *    4. Vbus ∈ [VBUS_RELAY_ON_MIN, VBUS_RELAY_ON_MAX]
+ *
+ *  断开条件（任一满足）：
+ *    1. Vbus 超出窗口
+ *    2. 任何故障（已由 spwm_outputs_off 处理）
+ *    3. SPWM 未使能
+ *
+ *  外部变量：g_relay_startup_ok（app.c 中定义，上电延时后置 true）
+ *
+ *  设计意图：
+ *    400V 母线系统在电容预充电完成前 Vbus < 310V → 继电器不吸合
+ *    过压 > 450V → 继电器断开，保护后级
+ *    故障时 spwm_outputs_off() 会调 board_relay_set(false)，这里再次确保
+ * ================================================================== */
+extern bool g_relay_startup_ok;  /* app.c 中定义 */
+
+static void bus_relay_task(void)
+{
+    if (g_fault != FAULT_NONE) {
+        board_relay_set(false);
+        return;
+    }
+
+    if (!g_spwm_enabled || !g_relay_startup_ok) {
+        board_relay_set(false);
+        return;
+    }
+
+    /* 母线电压窗口判断 */
+    if (g_adc.vbus >= VBUS_RELAY_ON_MIN && g_adc.vbus <= VBUS_RELAY_ON_MAX) {
+        board_relay_set(true);   /* 电压在安全窗口内 → 吸合 */
+    } else {
+        board_relay_set(false);  /* 电压超出窗口 → 断开 */
+    }
+}
+
+/* ==================================================================
  *  短路重试任务
  * ================================================================== */
 static void short_retry_task(void)
@@ -194,6 +239,9 @@ void protection_task_1ms(void)
      * 任务 1：风扇控制（独立于故障状态，始终工作）
      */
     fan_task();
+
+    /* 任务 1.5：母线电压窗口继电器管理（独立于故障状态） */
+    bus_relay_task();
 
     /*
      * 任务 2：硬件刹车/外部短路检测

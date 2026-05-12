@@ -27,6 +27,8 @@ static uint32_t s_start_ms;        /* 启动计时器（从 0 到 SPWM_SOFTSTART
 static uint32_t s_relay_ms;        /* 继电器延时计时器 */
 static uint16_t s_status_ms;       /* 串口状态输出间隔计时器 */
 
+bool g_relay_startup_ok = false;   /* 上电延时完成标志（供 protection.c 的 bus_relay_task 使用） */
+
 /* ==================================================================
  *  首次启动尝试
  * ================================================================== */
@@ -50,6 +52,7 @@ static void inverter_start_if_ready(void)
         pid_reset(&s_voltage_pid);
         s_start_ms = 0;
         s_relay_ms = 0;
+        g_relay_startup_ok = false;        /* 重新开始上电延时 */
         g_spwm_amp = 0;                    /* 从零开始软启动 */
         spwm_outputs_on();
         debug_uart_print("SPWM START\r\n");
@@ -126,8 +129,10 @@ static void control_task_1ms(void)
     int16_t limit;
     int16_t slew;
 
-    /* PWM 未使能时跳过控制 */
+    /* PWM 未使能时跳过控制，同时复位继电器状态 */
     if (!g_spwm_enabled) {
+        g_relay_startup_ok = false;
+        s_relay_ms = 0;
         return;
     }
 
@@ -169,16 +174,24 @@ static void control_task_1ms(void)
                                     slew);
 
     /*
-     * 继电器延时管理
-     * 启动后等待 SPWM_RELAY_DELAY_MS 再吸合继电器。
-     * PID 控制与继电器计时并行（不阻塞），
-     * 确保输出电压先稳定再接通负载。
+     * 继电器管理（母线电压窗口）
+     *
+     *   继电器用于母线侧控制（预充电旁路/直流接触器等），
+     *   在 control_task_1ms 中仅处理正常运行的延时吸合。
+     *
+     *   断开由 protection_task_1ms 统一管理：
+     *     - Vbus 超出 [VBUS_RELAY_ON_MIN, VBUS_RELAY_ON_MAX] → 断开
+     *     - 任何故障 → spwm_outputs_off() → 断开
+     *
+     *   上电延时 VBUS_RELAY_STARTUP_DELAY_MS 后才允许吸合，
+     *   给母线电容充电留足时间（400V 系统需要更长的预充电）。
      */
-    if (s_relay_ms < SPWM_RELAY_DELAY_MS) {
+    if (s_relay_ms < VBUS_RELAY_STARTUP_DELAY_MS) {
         s_relay_ms++;
     } else {
-        board_relay_set(true);
+        g_relay_startup_ok = true;   /* 上电延时到，通知 protection.c 可以吸合 */
     }
+    /* 继电器实际吸合由 protection_task_1ms 中的 bus_relay_task 判断母线窗口决定 */
 }
 
 /* ==================================================================
