@@ -23,9 +23,12 @@ typedef struct {
     uint16_t vbus;           /* 母线电压 ADC 值 */
 
     /* 有效值 */
-    uint16_t rms_volt;       /* 电压真有效值（×100，如 22000 = 220.00V） */
+    uint16_t rms_volt;       /* 电压真有效值（×100，如 22000 = 220.00V，800ms 级） */
     uint16_t rms_curr;       /* 电流真有效值（×100，如 500 = 5.00A） */
     uint16_t power;          /* 有功功率（W） */
+
+    /* PID 反馈用快速 RMS（20ms 滑动窗口，一个 50Hz 完整周波） */
+    uint16_t vout_rms_fast;  /* 电压 ADC 码值的 20ms 滑动 RMS，无纹波 */
 
     /* 温度 */
     int16_t  temp_celsius;   /* 温度 ℃（×10，如 255 = 25.5℃） */
@@ -42,6 +45,9 @@ uint16_t adc_get_raw(uint8_t channel);
 
 /* RMS 有效值计算（每 1ms 调用，内部累积 800 个采样点后更新） */
 void adc_calc_rms_1ms(void);
+
+/* 快速滑动 RMS（20ms 窗口，O(1) 运算量，每 ms 更新，供 PID 反馈用） */
+void adc_calc_fast_rms_1ms(void);
 
 /* 转换为实际温度 ℃ */
 int16_t adc_temp_to_celsius(uint16_t adc_raw);

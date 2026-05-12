@@ -348,7 +348,7 @@ void protection_task_1ms(void)
      *   持续 OUTPUT_LOW_TRIP_MS (700 ms) 后触发。
      *   可能原因：负载短路、输出开路、反馈回路断裂。
      */
-    if ((s_run_ms > SPWM_SOFTSTART_MS) && (g_adc.vout < VOUT_ADC_LOW_LOCK)) {
+    if ((s_run_ms > SPWM_SOFTSTART_MS) && (g_adc.vout_rms_fast < VOUT_ADC_LOW_LOCK)) {
         if (++s_output_low_ms >= OUTPUT_LOW_TRIP_MS) {
             protection_latch_fault(FAULT_OUTPUT_LOW);
         }

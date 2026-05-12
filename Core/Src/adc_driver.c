@@ -14,7 +14,54 @@ volatile adc_values_t g_adc;
 static volatile uint16_t s_adc_dma[4];
 
 /* ==================================================================
- *  RMS 计算缓冲区
+ *  快速滑动 RMS（20ms 窗口 = 一个 50Hz 完整周波，O(1) 运算量）
+ *
+ *  维护一个 20 点的环形缓冲 + 平方和累加器。
+ *  每 1ms 推入新瞬时值、移除最旧值、更新平方和。
+ *  无需每次重算 20 个点，只需一次乘法和一次减法。
+ * ================================================================== */
+#define FAST_RMS_WINDOW  20         /* 20ms = 一个 50Hz 周期 */
+static uint16_t s_vout_ring[FAST_RMS_WINDOW];
+static uint8_t  s_vout_ring_idx;
+static uint32_t s_vout_sum_sq;      /* 滑动窗口平方和 */
+static bool     s_vout_ring_full;
+
+/* 整数开方（牛顿迭代，输入 < 2^24 安全） */
+static uint16_t isqrt_u32(uint32_t x)
+{
+    if (x == 0) return 0;
+    uint32_t r = (x + 1U) / 2U;
+    for (uint8_t i = 0; i < 5; i++) {
+        r = (r + x / r) / 2U;
+    }
+    return (uint16_t)r;
+}
+
+void adc_calc_fast_rms_1ms(void)
+{
+    uint16_t new_val = g_adc.vout;                      /* 当前 IIR 滤波瞬时值 */
+    uint16_t old_val = s_vout_ring[s_vout_ring_idx];     /* 20ms 前的最旧值 */
+
+    /* O(1) 更新：减去旧值的平方，加上新值的平方 */
+    s_vout_sum_sq += (uint32_t)new_val * new_val;
+    s_vout_sum_sq -= (uint32_t)old_val * old_val;
+
+    s_vout_ring[s_vout_ring_idx] = new_val;
+    s_vout_ring_idx = (uint8_t)((s_vout_ring_idx + 1U) % FAST_RMS_WINDOW);
+
+    if (s_vout_ring_idx == 0) s_vout_ring_full = true;
+
+    if (s_vout_ring_full) {
+        /* 20ms 滑动 RMS = sqrt(平方和均值) */
+        g_adc.vout_rms_fast = isqrt_u32(s_vout_sum_sq / FAST_RMS_WINDOW);
+    } else {
+        /* 环形缓冲未满（启动后 < 20ms），暂用瞬时值 */
+        g_adc.vout_rms_fast = new_val;
+    }
+}
+
+/* ==================================================================
+ *  RMS 计算缓冲区（显示用，800ms 更新）
  *  借鉴 ZFM32F030：累积 800 个采样点（≈800ms）后计算一次 RMS
  * ================================================================== */
 static uint32_t s_rms_volt_acc;    /* Σv² 累加器 */

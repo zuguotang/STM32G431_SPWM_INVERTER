@@ -216,10 +216,10 @@ static void control_task_1ms(void)
         slew = 1;
     }
 
-    /* 调用 PID 计算，输出写入 g_spwm_amp */
+    /* PID 反馈用 20ms 滑动 RMS（无纹波直流信号，精度大幅提升） */
     g_spwm_amp = (uint16_t)pid_step(&s_voltage_pid,
                                     (int16_t)VOUT_ADC_TARGET_220V,
-                                    (int16_t)g_adc.vout,
+                                    (int16_t)g_adc.vout_rms_fast,
                                     limit,
                                     slew);
 
@@ -250,11 +250,13 @@ static void control_task_1ms(void)
 void app_task_1ms(void)
 {
     /*
-     * 任务 1：ADC 采样 + 低通滤波 + RMS 有效值计算
-     *   从 DMA 缓冲读取四通道原始值，更新 g_adc 滤波值
-     *   adc_calc_rms_1ms() 累积 800 个采样点后更新 RMS 电压/电流/功率
+     * 任务 1：ADC 采样 + 低通滤波 + 快速RMS + 显示RMS
+     *   adc_sample_filtered_1ms()  → IIR 滤波瞬时值
+     *   adc_calc_fast_rms_1ms()    → 20ms滑动RMS（PID反馈用）
+     *   adc_calc_rms_1ms()          → 800ms累积RMS（显示用）
      */
     adc_sample_filtered_1ms();
+    adc_calc_fast_rms_1ms();
     adc_calc_rms_1ms();
 
     /*
