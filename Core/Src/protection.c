@@ -316,7 +316,7 @@ void protection_task_1ms(void)
      *   Lv2 过流    > 3040 × 110% = 3344           2000ms    锁存故障
      *   Lv3 过流    > 3040 × 120% = 3648            500ms    锁存故障（逼近短路速度）
      *
-     *   真短路由硬件 BKIN (PA6) 纳秒关断 + PA4 通知 MCU 重试计数。
+     *   真短路由硬件 BKIN (PA6) 纳秒关断 + PA15 通知 MCU 重试计数。
      *   软件不再重复检测短路，只做多级过流。
      */
     if (s_run_ms > STARTUP_CURRENT_BLANK_MS && g_adc.iout > IOUT_ADC_OVERLOAD) {

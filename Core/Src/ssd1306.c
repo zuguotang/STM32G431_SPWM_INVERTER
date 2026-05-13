@@ -1,16 +1,14 @@
 /*
  * SSD1306 OLED 驱动实现 (I2C, 128×64)
  * ===================================
- * 使用 HAL I2C 发送命令和数据，硬件 I2C2。
+ * 使用 HAL I2C 发送命令和数据，硬件 I2C1。
  * 帧缓冲 1024 字节，逐页非阻塞刷新。
  */
 
 #include "ssd1306.h"
+#include "main.h"
 #include "stm32g4xx_hal.h"
 #include <string.h>
-
-/* 外部引用 I2C2 句柄（在 main.c 中定义） */
-extern I2C_HandleTypeDef hi2c1;
 
 /* 5×7 ASCII 字体 (32..127)，每字符 5 字节 */
 static const uint8_t font5x7[96][5] = {

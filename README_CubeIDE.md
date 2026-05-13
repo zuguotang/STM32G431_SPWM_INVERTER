@@ -1,5 +1,7 @@
 # 在 STM32CubeIDE 中编译本工程
 
+快速逐项核对可直接看：[CubeMX_对照清单.md](</C:/Users/zuguotang/Desktop/STM32G431_SPWM_INVERTER/CubeMX_对照清单.md>)
+
 ---
 
 ## 第一步：创建 CubeMX 工程并生成 HAL 库
@@ -22,8 +24,8 @@
 | PA1 | ADC1_IN2 | 输出电流采样 |
 | PA2 | USART2_TX | 调试串口 |
 | PA3 | USART2_RX | 调试串口 |
-| PA4 | ADC1_IN4 | NTC 温度传感器 |
-| PA5 | ADC1_IN5 | 母线电压采样 |
+| PA4 | ADC2_IN4 | NTC 温度传感器 |
+| PA5 | ADC2_IN5 | 母线电压采样 |
 | PA6 | TIM1_BKIN | 硬件刹车 |
 | PA7 | TIM1_CH1N | A 桥臂低侧 |
 | PA8 | TIM1_CH1 | A 桥臂高侧 |
@@ -100,25 +102,42 @@ Configuration：
 ### 1.7 ADC1 配置
 
 左侧 **Analog → ADC1**：
-- [x] IN1 / IN2 / IN4 / IN5 Single-ended
+- [x] IN1 / IN2 Single-ended
 
 Configuration：
 - Clock Prescaler: **Asynchronous /4**
 - Resolution: **12 bits**
 - Scan Conversion Mode: **Enable**
 - Continuous Conversion Mode: **Enable**
-- Number Of Conversions: **4**
+- Number Of Conversions: **2**
 - DMA Continuous Requests: **Enable**
 
-四个 Rank：
+两个 Rank：
 | Rank | Channel | Sampling Time |
 |------|---------|---------------|
 | 1 | Channel 1 | 47.5 Cycles |
 | 2 | Channel 2 | 47.5 Cycles |
-| 3 | Channel 4 | 47.5 Cycles |
-| 4 | Channel 5 | 47.5 Cycles |
 
-### 1.8 DMA 配置
+### 1.8 ADC2 配置
+
+**Analog → ADC2**：
+- [x] IN4 / IN5 Single-ended
+
+Configuration：
+- Clock Prescaler: **Asynchronous /4**
+- Resolution: **12 bits**
+- Scan Conversion Mode: **Enable**
+- Continuous Conversion Mode: **Enable**
+- Number Of Conversions: **2**
+- DMA Continuous Requests: **Enable**
+
+两个 Rank：
+| Rank | Channel | Sampling Time |
+|------|---------|---------------|
+| 1 | Channel 4 | 47.5 Cycles |
+| 2 | Channel 5 | 47.5 Cycles |
+
+### 1.9 DMA 配置
 
 **System Core → DMA** → DMA1 标签页：
 - 点 **Add** → 选 **ADC1**
@@ -126,24 +145,29 @@ Configuration：
 - Memory Increment: **Enable**
 - Data Width: **Half Word**
 
-### 1.9 I2C1 配置
+- 再点 **Add** → 选 **ADC2**
+- Mode: **Circular**
+- Memory Increment: **Enable**
+- Data Width: **Half Word**
+
+### 1.10 I2C1 配置
 
 **Connectivity → I2C1**：
 - Mode: **I2C**
 - Speed: **Fast Mode (400kHz)**
 
-### 1.10 USART2 配置
+### 1.11 USART2 配置
 
 **Connectivity → USART2**：
 - Mode: **Asynchronous**
 - Baud Rate: **115200**
 
-### 1.11 系统设置
+### 1.12 系统设置
 
 **System Core → SYS**：
 - Debug: **Serial Wire**
 
-### 1.12 项目设置
+### 1.13 项目设置
 
 点 **Project Manager** 标签页：
 - Application Structure: **Advanced**
@@ -151,7 +175,7 @@ Configuration：
   - [x] Copy all used libraries into the project folder
   - [x] Keep User Code when re-generating
 
-### 1.13 生成代码
+### 1.14 生成代码
 
 点工具栏 **齿轮 ⚙ Generate Code**（或 Alt+K）
 

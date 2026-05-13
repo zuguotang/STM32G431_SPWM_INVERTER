@@ -8,11 +8,13 @@
  *   2. SystemClock_Config()      → HSI+PLL → 170 MHz
  *   3. MX_GPIO_Init()            → 输出/输入引脚配置
  *   4. MX_DMA_Init()             → DMA + DMAMUX 时钟使能
- *   5. MX_ADC1_Init()            → ADC1 4通道扫描 + DMA
- *   6. MX_TIM1_Init()            → TIM1 22 kHz 互补 PWM + BKIN
- *   7. MX_TIM6_Init()            → TIM6 1 kHz 时基
- *   8. MX_USART1_UART_Init()     → USART1 115200 调试串口
- *   9. app_init()                → 应用层初始化（SPWM/保护/PID/ADC启动）
+ *   5. MX_ADC1_Init()            → ADC1 2通道扫描 + DMA
+ *   6. MX_ADC2_Init()            → ADC2 2通道扫描 + DMA
+ *   7. MX_TIM1_Init()            → TIM1 22 kHz 互补 PWM + BKIN
+ *   8. MX_TIM6_Init()            → TIM6 1 kHz 时基
+ *   9. MX_USART2_UART_Init()     → USART2 115200 调试串口
+ *  10. MX_I2C1_Init()            → I2C1 OLED 接口
+ *  11. app_init()                → 应用层初始化（SPWM/保护/PID/ADC启动）
  *
  * 主循环：
  *   等待 s_tick_1ms 标志（由 TIM6 中断置位），
@@ -21,7 +23,7 @@
  * 与 STM8S 版本的关键区别：
  *   - 使用 CubeMX 风格的 MX_xxx_Init() 函数初始化外设
  *   - TIM6 直接产生 1 kHz 中断（而非 16 kHz 分频）
- *   - ADC 使用 DMA 连续扫描，无需 CPU 轮询
+ *   - ADC1/ADC2 使用 DMA 连续扫描，无需 CPU 轮询
  *   - 故障 LED 和串口调试在本版本中新增
  */
 
@@ -75,7 +77,7 @@ int main(void)
 
     /*
      * 第 3 步：外设初始化
-     *   顺序：GPIO → DMA → ADC → TIM1 → TIM6 → USART1
+     *   顺序：GPIO → DMA → ADC1 → ADC2 → TIM1 → TIM6 → USART2 → I2C1
      *   DMA 必须在 ADC 之前初始化（ADC 依赖 DMA 句柄）
      *   TIM1 在 app_init 中才启动 PWM 输出
      */
@@ -171,7 +173,7 @@ static void SystemClock_Config(void)
 }
 
 /* ==================================================================
- *  ADC1 初始化：4 通道扫描 + DMA 连续转换
+ *  ADC1 初始化：2 通道扫描 + DMA 连续转换
  * ================================================================== */
 static void MX_ADC1_Init(void)
 {
@@ -184,8 +186,8 @@ static void MX_ADC1_Init(void)
      * ADC 时钟 = SYSCLK / 4 = 42.5 MHz（异步时钟）
      * 12 位分辨率：每个采样 47.5 + 12.5 = 60 ADC 周期 ≈ 1.4 us
      *
-     * 扫描模式：4 个通道按 Rank 顺序依次转换
-     * 连续转换 + DMA：转换结果自动经 DMA 循环写入 s_adc_dma[4]
+     * 扫描模式：2 个通道按 Rank 顺序依次转换
+     * 连续转换 + DMA：转换结果自动经 DMA 循环写入 s_adc_dma1[2]
      * EOC 选择 SEQ_CONV：序列结束才置 EOC（减少中断）
      */
     hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;
@@ -214,7 +216,7 @@ static void MX_ADC1_Init(void)
     }
 
     /*
-     * 配置通道采样参数（四个通道共用相同的采样时间）
+     * 配置通道采样参数（两个通道共用相同的采样时间）
      * 采样时间 47.5 ADC 周期 @ 42.5 MHz ≈ 1.12 us
      * 总转换时间 = 1.12 + 0.29(12.5周期) ≈ 1.41 us/ch
      */
@@ -225,10 +227,8 @@ static void MX_ADC1_Init(void)
 
     /*
      * 通道 → DMA 缓冲索引映射：
-     *   Rank 1 → CH1 (PA0) → s_adc_dma[0]  → 输出电压
-     *   Rank 2 → CH2 (PA1) → s_adc_dma[1]  → 输出电流
-     *   Rank 3 → CH4 (PA4) → s_adc_dma[2]  → NTC 温度
-     *   Rank 4 → CH5 (PA5) → s_adc_dma[3]  → 母线电压
+     *   Rank 1 → CH1 (PA0) → s_adc_dma1[0] → 输出电压
+     *   Rank 2 → CH2 (PA1) → s_adc_dma1[1] → 输出电流
      */
     sConfig.Channel = ADC_CHANNEL_1;
     sConfig.Rank = ADC_REGULAR_RANK_1;
@@ -238,13 +238,53 @@ static void MX_ADC1_Init(void)
     sConfig.Rank = ADC_REGULAR_RANK_2;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
 
+}
+
+/* ==================================================================
+ *  ADC2 初始化：2 通道扫描 + DMA 连续转换
+ * ================================================================== */
+static void MX_ADC2_Init(void)
+{
+    ADC_ChannelConfTypeDef sConfig = {0};
+
+    hadc2.Instance = ADC2;
+
+    hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;
+    hadc2.Init.Resolution = ADC_RESOLUTION_12B;
+    hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    hadc2.Init.GainCompensation = 0;
+    hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
+    hadc2.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+    hadc2.Init.LowPowerAutoWait = DISABLE;
+    hadc2.Init.ContinuousConvMode = ENABLE;
+    hadc2.Init.NbrOfConversion = 2;
+    hadc2.Init.DiscontinuousConvMode = DISABLE;
+    hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+    hadc2.Init.DMAContinuousRequests = ENABLE;
+    hadc2.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+    hadc2.Init.OversamplingMode = DISABLE;
+    if (HAL_ADC_Init(&hadc2) != HAL_OK) {
+        Error_Handler();
+    }
+
+    sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
+    sConfig.SingleDiff = ADC_SINGLE_ENDED;
+    sConfig.OffsetNumber = ADC_OFFSET_NONE;
+    sConfig.Offset = 0;
+
+    /*
+     * 通道 → DMA 缓冲索引映射：
+     *   Rank 1 → CH4 (PA4) → s_adc_dma2[0] → NTC 温度
+     *   Rank 2 → CH5 (PA5) → s_adc_dma2[1] → 母线电压
+     */
     sConfig.Channel = ADC_CHANNEL_4;
-    sConfig.Rank = ADC_REGULAR_RANK_3;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
+    sConfig.Rank = ADC_REGULAR_RANK_1;
+    if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK) Error_Handler();
 
     sConfig.Channel = ADC_CHANNEL_5;
-    sConfig.Rank = ADC_REGULAR_RANK_4;
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
+    sConfig.Rank = ADC_REGULAR_RANK_2;
+    if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK) Error_Handler();
 }
 
 /* ==================================================================
@@ -352,7 +392,7 @@ static void MX_TIM6_Init(void)
 }
 
 /* ==================================================================
- *  USART1 初始化：调试串口
+ *  USART2 初始化：调试串口
  * ================================================================== */
 static void MX_USART2_UART_Init(void)
 {

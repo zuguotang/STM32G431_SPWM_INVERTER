@@ -31,6 +31,9 @@ extern TIM_HandleTypeDef htim6;
 /* USART2 句柄：调试串口 115200-8-N-1 */
 extern UART_HandleTypeDef huart2;
 
+/* I2C1 句柄：SSD1306 OLED */
+extern I2C_HandleTypeDef hi2c1;
+
 /* HAL 初始化异常时调用，禁用全局中断并死循环 */
 void Error_Handler(void);
 

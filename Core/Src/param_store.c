@@ -13,6 +13,7 @@
  */
 
 #include "param_store.h"
+#include <stddef.h>
 #include <string.h>
 #include "stm32g4xx_hal.h"
 #include "debug_uart.h"

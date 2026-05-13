@@ -10,6 +10,7 @@
 #define HAL_EXTI_MODULE_ENABLED
 #define HAL_FLASH_MODULE_ENABLED
 #define HAL_GPIO_MODULE_ENABLED
+#define HAL_I2C_MODULE_ENABLED
 #define HAL_PWR_MODULE_ENABLED
 #define HAL_RCC_MODULE_ENABLED
 #define HAL_TIM_MODULE_ENABLED
@@ -39,6 +40,7 @@
 #include "stm32g4xx_hal_pwr_ex.h"
 #include "stm32g4xx_hal_flash.h"
 #include "stm32g4xx_hal_exti.h"
+#include "stm32g4xx_hal_i2c.h"
 #include "stm32g4xx_hal_tim.h"
 #include "stm32g4xx_hal_tim_ex.h"
 #include "stm32g4xx_hal_uart.h"

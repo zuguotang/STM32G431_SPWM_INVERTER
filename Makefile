@@ -51,10 +51,14 @@ Core/Src/main.c \
 Core/Src/app.c \
 Core/Src/adc_driver.c \
 Core/Src/board.c \
+Core/Src/button.c \
 Core/Src/debug_uart.c \
+Core/Src/lcd_menu.c \
+Core/Src/param_store.c \
 Core/Src/pid.c \
 Core/Src/protection.c \
 Core/Src/spwm.c \
+Core/Src/ssd1306.c \
 Core/Src/stm32g4xx_hal_msp.c \
 Core/Src/stm32g4xx_it.c \
 Core/Src/syscalls.c \
@@ -72,6 +76,8 @@ Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c \
+Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c \
+Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c \
 Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c \
@@ -96,19 +102,19 @@ vpath %.s $(sort $(dir $(ASM_SOURCES)))
 #  编译选项
 # ================================================================
 CFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) \
-         -O2 \                          # 优化等级 2（性能优先）
-         -Wall -Wextra \                # 开启主要警告
-         -ffunction-sections \          # 每个函数独立段（配合 gc-sections 去未用代码）
-         -fdata-sections                # 每个数据独立段
+         -O2 \
+         -Wall -Wextra \
+         -ffunction-sections \
+         -fdata-sections
 
 ASFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) -Wall -fdata-sections -ffunction-sections
 
 LDFLAGS = $(MCU) \
-          -TSTM32G431KBTx_FLASH.ld \    # 链接脚本（内存布局）
-          -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref \  # 生成交叉引用 Map
-          -Wl,--gc-sections \           # 清除未引用的函数/数据段（減小体积）
-          -specs=nano.specs \           # newlib-nano 精简 C 库
-          -lc -lm -lnosys               # 链接 C 库和数学库，nosys = 无系统调用
+          -TSTM32G431KBTx_FLASH.ld \
+          -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref \
+          -Wl,--gc-sections \
+          -specs=nano.specs \
+          -lc -lm -lnosys
 
 # ================================================================
 #  构建目标

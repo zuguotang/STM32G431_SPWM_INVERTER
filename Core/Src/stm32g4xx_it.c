@@ -14,8 +14,8 @@
  *   0,0  TIM1_UP      → SPWM 更新 (最高优先级，22 kHz)
  *   0,1  TIM1_BRK     → 硬件刹车
  *   1,0  TIM6_DAC     → 系统时基 1 kHz
- *   2,0  DMA1_Ch1     → ADC DMA 传输完成
- *   2,1  ADC1         → ADC 序列转换完成
+ *   2,0  DMA1_Ch1/2   → ADC DMA 传输完成
+ *   2,1  ADC1_2       → ADC 序列转换完成
  */
 
 #include "main.h"
@@ -81,10 +81,20 @@ void DMA1_Channel1_IRQHandler(void)
     HAL_DMA_IRQHandler(&hdma_adc1);
 }
 
+void DMA1_Channel2_IRQHandler(void)
+{
+    /*
+     * ADC2 DMA 传输完成/半完成/错误中断。
+     * 与 ADC1 一样使用 DMA 循环模式，无需额外回调逻辑。
+     */
+    HAL_DMA_IRQHandler(&hdma_adc2);
+}
+
 void ADC1_2_IRQHandler(void)
 {
-    /* ADC1 转换完成/溢出中断 → HAL_ADC_IRQHandler */
+    /* ADC1/ADC2 转换完成/溢出中断 → HAL_ADC_IRQHandler */
     HAL_ADC_IRQHandler(&hadc1);
+    HAL_ADC_IRQHandler(&hadc2);
 }
 
 /* ==================================================================

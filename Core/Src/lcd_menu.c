@@ -13,6 +13,7 @@
 #include "spwm.h"
 #include "protection.h"
 #include "board.h"
+#include <stdio.h>
 
 typedef enum {
     ST_MAIN_SCREEN = 0,

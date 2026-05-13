@@ -32,8 +32,11 @@ typedef struct {
     uint16_t overload_trip_ms;  /* 过载延时 ms (100..10000) */
     uint16_t pid_start_limit;   /* 软启动调制上限 (100..930) */
 
-    uint8_t  padding[1014];
+    uint8_t  padding[1002];
 } param_blob_t;
+
+_Static_assert(sizeof(param_blob_t) == PARAM_BLOB_SIZE,
+               "param_blob_t size must match PARAM_BLOB_SIZE");
 
 extern param_blob_t g_params;
 
