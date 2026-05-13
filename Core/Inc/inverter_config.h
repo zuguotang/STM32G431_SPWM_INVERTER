@@ -172,11 +172,11 @@
  *  第 6 节：GPIO 引脚映射（编译期固定）
  * ================================================================== */
 
-#define FAULT_LED_GPIO_Port             GPIOB
-#define FAULT_LED_Pin                   GPIO_PIN_8
+#define FAULT_LED_GPIO_Port             GPIOF
+#define FAULT_LED_Pin                   GPIO_PIN_1
 
-#define FAN_GPIO_Port                   GPIOB
-#define FAN_Pin                         GPIO_PIN_9
+#define FAN_GPIO_Port                   GPIOA
+#define FAN_Pin                         GPIO_PIN_10
 
 #define RELAY_GPIO_Port                 GPIOB
 #define RELAY_Pin                       GPIO_PIN_5
@@ -189,9 +189,9 @@
 #define MODE_SEL_GPIO_Port              GPIOB
 #define MODE_SEL_Pin                    GPIO_PIN_4
 
-/* 短路信号输入：PA4让给ADC，引脚移至PB10 */
-#define SHORT_MCU_GPIO_Port             GPIOB
-#define SHORT_MCU_Pin                   GPIO_PIN_10
+/* 短路信号输入：LQFP32无PB10，改用PA15 */
+#define SHORT_MCU_GPIO_Port             GPIOA
+#define SHORT_MCU_Pin                   GPIO_PIN_15
 
 /* SSD1306 OLED (I2C1: PB6=SCL, PB7=SDA) — LQFP32无I2C2 */
 #define OLED_I2C_SCL_GPIO_Port          GPIOB
@@ -200,8 +200,8 @@
 #define OLED_I2C_SDA_Pin                GPIO_PIN_7
 
 /* 按键（数字 GPIO，下拉输入） */
-#define BTN_UP_GPIO_Port                GPIOB
-#define BTN_UP_Pin                      GPIO_PIN_11
+#define BTN_UP_GPIO_Port                GPIOF
+#define BTN_UP_Pin                      GPIO_PIN_0
 #define BTN_DOWN_GPIO_Port              GPIOA
 #define BTN_DOWN_Pin                    GPIO_PIN_11
 #define BTN_OK_GPIO_Port                GPIOA

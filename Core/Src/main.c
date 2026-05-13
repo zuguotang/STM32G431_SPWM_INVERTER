@@ -419,35 +419,45 @@ static void MX_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    /* 使能 GPIO 时钟 */
+    /* enable GPIO clocks */
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOF_CLK_ENABLE();
 
-    /* PB8(故障LED) + PB9(风扇) + PB5(继电器) → 推挽输出 */
-    GPIO_InitStruct.Pin = FAULT_LED_Pin | FAN_Pin | RELAY_Pin;
+    /* RELAY(PB5) */
+    GPIO_InitStruct.Pin = RELAY_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PB3(频率选择) + PB4(模式选择) → 下拉输入（LQFP32无PB1/PB2） */
+    /* FAN(PA10) -- PB9 not on LQFP32 */
+    GPIO_InitStruct.Pin = FAN_Pin;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* FAULT_LED(PF1) -- PB8 is BOOT0, moved to PF1 */
+    GPIO_InitStruct.Pin = FAULT_LED_Pin;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+    /* FREQ_SEL(PB3) + MODE_SEL(PB4) -- pull-down input */
     GPIO_InitStruct.Pin = FREQ_SEL_Pin | MODE_SEL_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PB10(短路信号) + PB11(BTN_UP) → 下拉输入（PA4/PA5让给ADC） */
-    GPIO_InitStruct.Pin = SHORT_MCU_Pin | BTN_UP_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    /* BTN_DOWN(PA11) + BTN_OK(PA12) → 下拉输入 */
-    GPIO_InitStruct.Pin = BTN_DOWN_Pin | BTN_OK_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+    /* SHORT_MCU(PA15) -- PB10 not on LQFP32 */
+    GPIO_InitStruct.Pin = SHORT_MCU_Pin;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* BTN_DOWN(PA11) + BTN_OK(PA12) */
+    GPIO_InitStruct.Pin = BTN_DOWN_Pin | BTN_OK_Pin;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* BTN_UP(PF0) -- PB11 not on LQFP32 */
+    GPIO_InitStruct.Pin = BTN_UP_Pin;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 }
+
 
 /* ==================================================================
  *  HAL 中断回调
