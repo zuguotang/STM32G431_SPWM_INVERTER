@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* 外部引用 I2C2 句柄（在 main.c 中定义） */
-extern I2C_HandleTypeDef hi2c2;
+extern I2C_HandleTypeDef hi2c1;
 
 /* 5×7 ASCII 字体 (32..127)，每字符 5 字节 */
 static const uint8_t font5x7[96][5] = {
@@ -129,7 +129,7 @@ static bool i2c_write(uint8_t ctrl, const uint8_t *data, uint16_t len)
      * HAL_I2C_Mem_Write 自动发送：START + ADDR+W + Ctrl + Data + STOP
      * 超时 10ms，I2C 400kHz 下 128 字节 ≈ 2.6ms。
      */
-    return HAL_I2C_Mem_Write(&hi2c2, SSD1306_I2C_ADDR, ctrl,
+    return HAL_I2C_Mem_Write(&hi2c1, SSD1306_I2C_ADDR, ctrl,
                              I2C_MEMADD_SIZE_8BIT,
                              (uint8_t *)data, len, 10) == HAL_OK;
 }

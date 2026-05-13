@@ -189,19 +189,19 @@
 #define MODE_SEL_GPIO_Port              GPIOB
 #define MODE_SEL_Pin                    GPIO_PIN_4
 
-/* 短路信号输入：PB4已分配给MODE_SEL，改用PA4 */
-#define SHORT_MCU_GPIO_Port             GPIOA
-#define SHORT_MCU_Pin                   GPIO_PIN_4
+/* 短路信号输入：PA4让给ADC，引脚移至PB10 */
+#define SHORT_MCU_GPIO_Port             GPIOB
+#define SHORT_MCU_Pin                   GPIO_PIN_10
 
-/* SSD1306 OLED (I2C2: PB10=SCL, PB11=SDA) */
+/* SSD1306 OLED (I2C1: PB6=SCL, PB7=SDA) — LQFP32无I2C2 */
 #define OLED_I2C_SCL_GPIO_Port          GPIOB
-#define OLED_I2C_SCL_Pin                GPIO_PIN_10
+#define OLED_I2C_SCL_Pin                GPIO_PIN_6
 #define OLED_I2C_SDA_GPIO_Port          GPIOB
-#define OLED_I2C_SDA_Pin                GPIO_PIN_11
+#define OLED_I2C_SDA_Pin                GPIO_PIN_7
 
 /* 按键（数字 GPIO，下拉输入） */
-#define BTN_UP_GPIO_Port                GPIOA
-#define BTN_UP_Pin                      GPIO_PIN_5
+#define BTN_UP_GPIO_Port                GPIOB
+#define BTN_UP_Pin                      GPIO_PIN_11
 #define BTN_DOWN_GPIO_Port              GPIOA
 #define BTN_DOWN_Pin                    GPIO_PIN_11
 #define BTN_OK_GPIO_Port                GPIOA

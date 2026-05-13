@@ -1,7 +1,7 @@
 /*
  * 调试串口实现
  * ===========
- * 通过 USART1 输出故障信息和运行状态。
+ * 通过 USART2 输出故障信息和运行状态。
  *
  * 发送函数使用 HAL_UART_Transmit（阻塞模式），
  * 在 115200 波特率下发送一条状态行 (~50 字节) 约 4.3 ms。
@@ -41,7 +41,7 @@ void debug_uart_print(const char *text)
      * 超时 20 ms（足够发送约 230 字节 @115200）。
      * 如果串口未连接，超时后继续运行。
      */
-    HAL_UART_Transmit(&huart1, (uint8_t *)text, (uint16_t)strlen(text), 20U);
+    HAL_UART_Transmit(&huart2, (uint8_t *)text, (uint16_t)strlen(text), 20U);
 }
 
 /* ==================================================================
@@ -63,7 +63,7 @@ void debug_uart_print_fault(fault_code_t fault, uint8_t short_retry_used)
                      (unsigned)g_adc.vout, (unsigned)g_adc.iout,
                      (unsigned)g_adc.temp, (unsigned)g_adc.vbus);
     if (n > 0) {
-        HAL_UART_Transmit(&huart1, (uint8_t *)line, (uint16_t)n, 30U);
+        HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)n, 30U);
     }
 }
 
@@ -86,6 +86,6 @@ void debug_uart_print_status(void)
                      (unsigned)g_adc.temp, (unsigned)g_adc.vbus,
                      (unsigned)g_spwm_amp);
     if (n > 0) {
-        HAL_UART_Transmit(&huart1, (uint8_t *)line, (uint16_t)n, 20U);
+        HAL_UART_Transmit(&huart2, (uint8_t *)line, (uint16_t)n, 20U);
     }
 }

@@ -35,8 +35,8 @@ ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim6;
-UART_HandleTypeDef huart1;
-I2C_HandleTypeDef hi2c2;
+UART_HandleTypeDef huart2;
+I2C_HandleTypeDef hi2c1;
 
 /* 1 ms 标志：TIM6 ISR 置位，主循环清零 */
 static volatile bool s_tick_1ms = false;
@@ -48,8 +48,8 @@ static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM6_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_I2C2_Init(void);
+static void MX_USART2_UART_Init(void);
+static void MX_I2C1_Init(void);
 
 /* ==================================================================
  *  main() 主函数
@@ -81,8 +81,8 @@ int main(void)
     MX_ADC1_Init();
     MX_TIM1_Init();
     MX_TIM6_Init();
-    MX_USART1_UART_Init();
-    MX_I2C2_Init();
+    MX_USART2_UART_Init();
+    MX_I2C1_Init();
 
     /*
      * 第 4 步：应用层初始化
@@ -223,8 +223,8 @@ static void MX_ADC1_Init(void)
      * 通道 → DMA 缓冲索引映射：
      *   Rank 1 → CH1 (PA0) → s_adc_dma[0]  → 输出电压
      *   Rank 2 → CH2 (PA1) → s_adc_dma[1]  → 输出电流
-     *   Rank 3 → CH3 (PA2) → s_adc_dma[2]  → NTC 温度
-     *   Rank 4 → CH4 (PA3) → s_adc_dma[3]  → 母线电压
+     *   Rank 3 → CH4 (PA4) → s_adc_dma[2]  → NTC 温度
+     *   Rank 4 → CH5 (PA5) → s_adc_dma[3]  → 母线电压
      */
     sConfig.Channel = ADC_CHANNEL_1;
     sConfig.Rank = ADC_REGULAR_RANK_1;
@@ -234,11 +234,11 @@ static void MX_ADC1_Init(void)
     sConfig.Rank = ADC_REGULAR_RANK_2;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
 
-    sConfig.Channel = ADC_CHANNEL_3;
+    sConfig.Channel = ADC_CHANNEL_4;
     sConfig.Rank = ADC_REGULAR_RANK_3;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
 
-    sConfig.Channel = ADC_CHANNEL_4;
+    sConfig.Channel = ADC_CHANNEL_5;
     sConfig.Rank = ADC_REGULAR_RANK_4;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) Error_Handler();
 }
@@ -350,48 +350,48 @@ static void MX_TIM6_Init(void)
 /* ==================================================================
  *  USART1 初始化：调试串口
  * ================================================================== */
-static void MX_USART1_UART_Init(void)
+static void MX_USART2_UART_Init(void)
 {
     /*
-     * PB6=TX, PB7=RX, 115200-8-N-1
+     * PA2=TX, PA3=RX, 115200-8-N-1
      * 无硬件流控，16 倍过采样。
      */
-    huart1.Instance = USART1;
-    huart1.Init.BaudRate = 115200;
-    huart1.Init.WordLength = UART_WORDLENGTH_8B;
-    huart1.Init.StopBits = UART_STOPBITS_1;
-    huart1.Init.Parity = UART_PARITY_NONE;
-    huart1.Init.Mode = UART_MODE_TX_RX;
-    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-    huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-    huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-    huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-    if (HAL_UART_Init(&huart1) != HAL_OK) {
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+    huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+    huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+    if (HAL_UART_Init(&huart2) != HAL_OK) {
         Error_Handler();
     }
 }
 
 /* ==================================================================
- *  I2C2 初始化：SSD1306 OLED
+ *  I2C1 初始化：SSD1306 OLED
  * ================================================================== */
-static void MX_I2C2_Init(void)
+static void MX_I2C1_Init(void)
 {
     /*
-     * I2C2: PB10=SCL, PB11=SDA, 400kHz Fast Mode
+     * I2C1: PB6=SCL, PB7=SDA, 400kHz Fast Mode
      * SSD1306 支持 100kHz 和 400kHz，这里选 400kHz 以便快速刷新。
      * 8 页 × 128 字节 × 9 bits / 400kHz ≈ 23ms 全屏刷新。
      */
-    hi2c2.Instance = I2C2;
-    hi2c2.Init.Timing = 0x00303D5B;  /* 170MHz 下 400kHz 的推荐 Timing 值 */
-    hi2c2.Init.OwnAddress1 = 0;
-    hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-    hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-    hi2c2.Init.OwnAddress2 = 0;
-    hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-    hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-    hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-    if (HAL_I2C_Init(&hi2c2) != HAL_OK) {
+    hi2c1.Instance = I2C1;
+    hi2c1.Init.Timing = 0x00303D5B;  /* 170MHz 下 400kHz 的推荐 Timing 值 */
+    hi2c1.Init.OwnAddress1 = 0;
+    hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    hi2c1.Init.OwnAddress2 = 0;
+    hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+    hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
         Error_Handler();
     }
 }
@@ -436,16 +436,14 @@ static void MX_GPIO_Init(void)
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PA4(外部短路信号) → 下拉输入（PB4已移至MODE_SEL） */
-    GPIO_InitStruct.Pin = SHORT_MCU_Pin;
+    /* PB10(短路信号) + PB11(BTN_UP) → 下拉输入（PA4/PA5让给ADC） */
+    GPIO_InitStruct.Pin = SHORT_MCU_Pin | BTN_UP_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);  /* PA4，注意改为GPIOA */
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /*
-     * 按键 (PA5/PA11/PA12) → 下拉输入
-     */
-    GPIO_InitStruct.Pin = BTN_UP_Pin | BTN_DOWN_Pin | BTN_OK_Pin;
+    /* BTN_DOWN(PA11) + BTN_OK(PA12) → 下拉输入 */
+    GPIO_InitStruct.Pin = BTN_DOWN_Pin | BTN_OK_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);

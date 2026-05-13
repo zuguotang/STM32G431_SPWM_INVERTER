@@ -63,8 +63,8 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc)
      *   模拟模式、无上下拉（高阻态）。
      *   不需要配置速度（模拟引脚不涉及数字切换）。
      */
-    /* PA0~PA3 = ADC IN1~IN4 (电压/电流/温度/母线) */
-    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3;
+    /* PA0~PA1 + PA4~PA5 = ADC 四通道 (电压/电流/温度/母线) */
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -210,55 +210,54 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim)
 }
 
 /* ==================================================================
- *  I2C2 MSP 初始化 (SSD1306 OLED)
+ *  I2C1 MSP 初始化 (SSD1306 OLED)
  * ================================================================== */
 void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    if (hi2c->Instance != I2C2) return;
+    if (hi2c->Instance != I2C1) return;
 
-    __HAL_RCC_I2C2_CLK_ENABLE();
+    /* I2C1 在 APB1 上，使能时钟 */
+    __HAL_RCC_I2C1_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*
-     * PB10 = SCL, PB11 = SDA
+     * PB6 = SCL, PB7 = SDA
      * 复用开漏输出 (AF_OD)、外部上拉 4.7kΩ 到 3.3V
      */
     GPIO_InitStruct.Pin = OLED_I2C_SCL_Pin | OLED_I2C_SDA_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
+    GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
 /* ==================================================================
- *  UART MSP 初始化
+ *  UART MSP 初始化 (USART2)
  * ================================================================== */
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    if (huart->Instance != USART1) {
+    if (huart->Instance != USART2) {
         return;
     }
 
-    /* 使能 USART1 和 GPIOB 时钟 */
-    __HAL_RCC_USART1_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /* 使能 USART2 和 GPIOA 时钟 */
+    __HAL_RCC_USART2_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
 
     /*
-     * USART1 引脚配置：
-     *   PB6 (AF7) → USART1_TX
-     *   PB7 (AF7) → USART1_RX
-     *
-     * 复用推挽输出、上拉（确保空闲状态为高电平）。
+     * USART2 引脚配置：
+     *   PA2 (AF7) → USART2_TX
+     *   PA3 (AF7) → USART2_RX
      */
-    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }

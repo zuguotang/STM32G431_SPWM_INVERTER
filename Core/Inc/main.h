@@ -24,8 +24,8 @@ extern TIM_HandleTypeDef htim1;
 /* TIM6 句柄：1 ms 系统时基（170 MHz / 170 = 1 MHz，ARR=999 → 1 kHz） */
 extern TIM_HandleTypeDef htim6;
 
-/* USART1 句柄：调试串口 115200-8-N-1 */
-extern UART_HandleTypeDef huart1;
+/* USART2 句柄：调试串口 115200-8-N-1 */
+extern UART_HandleTypeDef huart2;
 
 /* HAL 初始化异常时调用，禁用全局中断并死循环 */
 void Error_Handler(void);

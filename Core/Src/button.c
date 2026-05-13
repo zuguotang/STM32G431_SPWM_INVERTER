@@ -26,7 +26,7 @@ static uint16_t    s_repeat_ms   = 0;
  * ================================================================== */
 static button_id_t read_buttons(void)
 {
-    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5)  == GPIO_PIN_SET) return BTN_UP;
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_11) == GPIO_PIN_SET) return BTN_UP;
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_11) == GPIO_PIN_SET) return BTN_DOWN;
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_12) == GPIO_PIN_SET) return BTN_OK;
     return BTN_NONE;
