@@ -4,13 +4,15 @@
 /*
  * ADC 驱动层
  * ---------
- * ADC1 + DMA 四通道连续扫描 + RMS 有效值 + 功率计算 + NTC 温度。
+ * ADC1 + ADC2 双独立 ADC + DMA + RMS + 功率 + NTC 温度。
  *
- * DMA 通道映射：
+ * ADC1 DMA1_Ch1:
  *   [0] CH1 → PA0 → 输出电压瞬时值
  *   [1] CH2 → PA1 → 输出电流瞬时值
- *   [2] CH3 → PA2 → NTC 温度传感器
- *   [3] CH4 → PA3 → 母线电压
+ *
+ * ADC2 DMA1_Ch2:
+ *   [0] CH4 → PA4 → NTC 温度传感器
+ *   [1] CH5 → PA5 → 母线电压
  */
 
 #include "main.h"

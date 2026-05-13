@@ -45,9 +45,58 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef *hadc)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    if (hadc->Instance != ADC1) {
+    /* 共用时钟（ADC1和ADC2共享ADC12门控） */
+    __HAL_RCC_ADC12_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_DMA1_CLK_ENABLE();
+
+    /* PA0~PA1 + PA4~PA5 = 模拟输入 */
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    if (hadc->Instance == ADC1) {
+        /* ADC1: DMA1_Ch1 */
+        hdma_adc1.Instance = DMA1_Channel1;
+        hdma_adc1.Init.Request = DMA_REQUEST_ADC1;
+        hdma_adc1.Init.Direction = DMA_PERIPH_TO_MEMORY;
+        hdma_adc1.Init.PeriphInc = DMA_PINC_DISABLE;
+        hdma_adc1.Init.MemInc = DMA_MINC_ENABLE;
+        hdma_adc1.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+        hdma_adc1.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+        hdma_adc1.Init.Mode = DMA_CIRCULAR;
+        hdma_adc1.Init.Priority = DMA_PRIORITY_HIGH;
+        if (HAL_DMA_Init(&hdma_adc1) != HAL_OK) Error_Handler();
+        __HAL_LINKDMA(hadc, DMA_Handle, hdma_adc1);
+
+        HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 2, 0);
+        HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+        HAL_NVIC_SetPriority(ADC1_2_IRQn, 2, 1);
+        HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
         return;
     }
+
+    if (hadc->Instance == ADC2) {
+        /* ADC2: DMA1_Ch2 */
+        hdma_adc2.Instance = DMA1_Channel2;
+        hdma_adc2.Init.Request = DMA_REQUEST_ADC2;
+        hdma_adc2.Init.Direction = DMA_PERIPH_TO_MEMORY;
+        hdma_adc2.Init.PeriphInc = DMA_PINC_DISABLE;
+        hdma_adc2.Init.MemInc = DMA_MINC_ENABLE;
+        hdma_adc2.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+        hdma_adc2.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+        hdma_adc2.Init.Mode = DMA_CIRCULAR;
+        hdma_adc2.Init.Priority = DMA_PRIORITY_HIGH;
+        if (HAL_DMA_Init(&hdma_adc2) != HAL_OK) Error_Handler();
+        __HAL_LINKDMA(hadc, DMA_Handle, hdma_adc2);
+
+        HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 2, 0);
+        HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+        return;
+    }
+
+    return;
 
     /* 使能 ADC12 时钟（ADC1 和 ADC2 共享同一个时钟门控） */
     __HAL_RCC_ADC12_CLK_ENABLE();

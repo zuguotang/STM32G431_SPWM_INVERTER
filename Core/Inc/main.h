@@ -14,9 +14,13 @@
 #include "stm32g4xx_hal.h"
 #include "inverter_config.h"
 
-/* ADC1 + DMA 句柄：4 通道连续扫描，DMA 循环传输 */
+/* ADC1 + DMA 句柄：PA0/PA1(IN1/IN2) */
 extern ADC_HandleTypeDef hadc1;
 extern DMA_HandleTypeDef hdma_adc1;
+
+/* ADC2 + DMA 句柄：PA4/PA5(IN4/IN5) */
+extern ADC_HandleTypeDef hadc2;
+extern DMA_HandleTypeDef hdma_adc2;
 
 /* TIM1 句柄：22 kHz 互补 SPWM + BKIN 硬件刹车 */
 extern TIM_HandleTypeDef htim1;

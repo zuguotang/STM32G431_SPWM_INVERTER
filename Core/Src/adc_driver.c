@@ -11,7 +11,8 @@
 #include "inverter_config.h"
 
 volatile adc_values_t g_adc;
-static volatile uint16_t s_adc_dma[4];
+static volatile uint16_t s_adc_dma1[2];  /* ADC1 DMA: PA0=IN1(vout), PA1=IN2(iout) */
+static volatile uint16_t s_adc_dma2[2];  /* ADC2 DMA: PA4=IN4(temp), PA5=IN5(vbus) */
 
 /* ==================================================================
  *  快速滑动 RMS（20ms 窗口 = 一个 50Hz 完整周波，O(1) 运算量）
@@ -130,21 +131,26 @@ int16_t adc_temp_to_celsius(uint16_t adc_raw)
  * ================================================================== */
 void adc_driver_start(void)
 {
+    /* ADC1 校准并启动 DMA（PA0=vout, PA1=iout） */
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)s_adc_dma, 4U);
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)s_adc_dma1, 2U);
 
-    /*
-     * 上电时采集电流通道偏置值（PWM 尚未开启，电流应为零）
-     * 借鉴 ZFM32F030 的 GetOffsetCurrent() 思路。
-     */
+    /* ADC2 校准并启动 DMA（PA4=temp, PA5=vbus） */
+    HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
+    HAL_ADC_Start_DMA(&hadc2, (uint32_t *)s_adc_dma2, 2U);
+
+    /* 上电时采集电流通道偏置值（PWM 尚未开启，电流应为零） */
     HAL_Delay(10);
-    g_adc.iout_offset = s_adc_dma[1];
+    g_adc.iout_offset = s_adc_dma1[1];  /* PA1 = iout */
 }
 
 uint16_t adc_get_raw(uint8_t channel)
 {
-    if (channel >= 4U) return 0U;
-    return s_adc_dma[channel];
+    if (channel == 0U) return s_adc_dma1[0];
+    if (channel == 1U) return s_adc_dma1[1];
+    if (channel == 2U) return s_adc_dma2[0];
+    if (channel == 3U) return s_adc_dma2[1];
+    return 0U;
 }
 
 /* ==================================================================
@@ -163,10 +169,10 @@ void adc_sample_filtered_1ms(void)
 {
     static bool init_done = false;
 
-    uint16_t vout = s_adc_dma[0];
-    uint16_t iout = s_adc_dma[1];
-    uint16_t temp = s_adc_dma[2];
-    uint16_t vbus = s_adc_dma[3];
+    uint16_t vout = s_adc_dma1[0];   /* ADC1 CH1 = PA0 */
+    uint16_t iout = s_adc_dma1[1];   /* ADC1 CH2 = PA1 */
+    uint16_t temp = s_adc_dma2[0];   /* ADC2 CH4 = PA4 */
+    uint16_t vbus = s_adc_dma2[1];   /* ADC2 CH5 = PA5 */
 
     /*
      * 电流零点偏置校准：

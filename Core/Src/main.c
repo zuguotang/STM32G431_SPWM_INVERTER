@@ -33,6 +33,8 @@
 /* HAL 外设句柄定义（头文件中为 extern 声明） */
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
+ADC_HandleTypeDef hadc2;
+DMA_HandleTypeDef hdma_adc2;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim6;
 UART_HandleTypeDef huart2;
@@ -46,6 +48,7 @@ static void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_ADC2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART2_UART_Init(void);
@@ -79,6 +82,7 @@ int main(void)
     MX_GPIO_Init();
     MX_DMA_Init();
     MX_ADC1_Init();
+    MX_ADC2_Init();
     MX_TIM1_Init();
     MX_TIM6_Init();
     MX_USART2_UART_Init();
@@ -192,7 +196,7 @@ static void MX_ADC1_Init(void)
     hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
     hadc1.Init.LowPowerAutoWait = DISABLE;
     hadc1.Init.ContinuousConvMode = ENABLE;
-    hadc1.Init.NbrOfConversion = 4;
+    hadc1.Init.NbrOfConversion = 2;
     hadc1.Init.DiscontinuousConvMode = DISABLE;
     hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
